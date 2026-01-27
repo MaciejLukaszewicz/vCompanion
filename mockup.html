@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vCompanion Mockup</title>
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="static/css/style.css">
+    <!-- ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <aside>
+        <div class="logo">
+            <i data-lucide="shield-check" style="stroke-width: 3px;"></i>
+            vCompanion
+        </div>
+        <nav>
+            <ul>
+                <li><a href="#" class="active"><i data-lucide="layout-dashboard"></i> Dashboard</a></li>
+                <li><a href="#"><i data-lucide="layers"></i> Inventory</a></li>
+                <li><a href="#"><i data-lucide="database"></i> Datastores</a></li>
+                <li><a href="#"><i data-lucide="server"></i> Hosts</a></li>
+                <li><a href="#"><i data-lucide="activity"></i> Performance</a></li>
+                <li><a href="#"><i data-lucide="file-text"></i> Reports</a></li>
+                <li><a href="#"><i data-lucide="settings"></i> Settings</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main>
+        <header>
+            <div>
+                <h1>Global Overview</h1>
+                <p style="color: var(--text-dim); font-size: 0.875rem;">Summary across 3 connected vCenter environments
+                </p>
+            </div>
+            <div class="search-bar">
+                <i data-lucide="search" size="18" style="color: var(--text-dim);"></i>
+                <input type="text" placeholder="Search VMs, IPs, Hosts...">
+            </div>
+        </header>
+
+        <section class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Virtual Machines</h3>
+                <div class="value">1,248</div>
+                <div class="delta up"><i data-lucide="trending-up"></i> +12 this week</div>
+            </div>
+            <div class="stat-card">
+                <h3>Active Snapshots</h3>
+                <div class="value">84</div>
+                <div class="delta down"><i data-lucide="trending-down"></i> -8 cleared</div>
+            </div>
+            <div class="stat-card">
+                <h3>Host Clusters</h3>
+                <div class="value">16</div>
+                <div class="delta" style="color: var(--text-dim)">Stable</div>
+            </div>
+            <div class="stat-card">
+                <h3>Critical Alerts</h3>
+                <div class="value" style="color: var(--danger)">3</div>
+                <div class="delta up" style="color: var(--danger)">Requires action</div>
+            </div>
+        </section>
+
+        <section class="charts-row">
+            <div class="chart-container">
+                <h2>Resource Consumption (Last 24h)</h2>
+                <div id="mainChart"></div>
+            </div>
+            <div class="chart-container">
+                <h2>VM Distribution by OS</h2>
+                <div id="donutChart"></div>
+            </div>
+        </section>
+
+        <section class="table-container">
+            <div
+                style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 1rem; font-weight: 600;">Recent Critical Events</h2>
+                <a href="#" style="color: var(--primary); font-size: 0.875rem; text-decoration: none;">View All</a>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>vCenter</th>
+                        <th>Target</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Datastore latency exceeded threshold</td>
+                        <td>Prod-01</td>
+                        <td>DS-SSD-Shared</td>
+                        <td><span class="status-badge critical">Critical</span></td>
+                        <td>2 mins ago</td>
+                    </tr>
+                    <tr>
+                        <td>VM Provisioning Started</td>
+                        <td>Dev-Lab</td>
+                        <td>Ubuntu-Web-04</td>
+                        <td><span class="status-badge success">Success</span></td>
+                        <td>14 mins ago</td>
+                    </tr>
+                    <tr>
+                        <td>Host connection lost</td>
+                        <td>Prod-02-DR</td>
+                        <td>esxi-node-14.local</td>
+                        <td><span class="status-badge critical">Critical</span></td>
+                        <td>45 mins ago</td>
+                    </tr>
+                    <tr>
+                        <td>High RAM usage detected</td>
+                        <td>Prod-01</td>
+                        <td>SQL-Cluster-Node-A</td>
+                        <td><span class="status-badge warning">Warning</span></td>
+                        <td>1 hour ago</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Main Area Chart
+        var areaOptions = {
+            series: [{
+                name: 'CPU Usage %',
+                data: [45, 52, 38, 45, 19, 23, 31, 28, 43, 62, 58, 41]
+            }, {
+                name: 'RAM Usage %',
+                data: [72, 68, 65, 75, 82, 85, 78, 80, 77, 73, 75, 71]
+            }],
+            chart: {
+                height: 300,
+                type: 'area',
+                toolbar: { show: false },
+                background: 'transparent',
+                foreColor: '#94a3b8'
+            },
+            colors: ['#3b82f6', '#8b5cf6'],
+            dataLabels: { enabled: false },
+            stroke: { curve: 'smooth', width: 2 },
+            grid: {
+                borderColor: 'rgba(255, 255, 255, 0.05)',
+                xaxis: { lines: { show: true } }
+            },
+            xaxis: {
+                categories: ['12am', '2am', '4am', '6am', '8am', '10am', '12pm', '2pm', '4pm', '6pm', '8pm', '10pm'],
+            },
+            tooltip: { theme: 'dark' },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shadeIntensity: 1,
+                    opacityFrom: 0.4,
+                    opacityTo: 0.1,
+                    stops: [0, 90, 100]
+                }
+            },
+        };
+
+        var mainChart = new ApexCharts(document.querySelector("#mainChart"), areaOptions);
+        mainChart.render();
+
+        // Donut Chart
+        var donutOptions = {
+            series: [540, 420, 288],
+            labels: ['Linux', 'Windows', 'Other'],
+            chart: {
+                type: 'donut',
+                height: 300,
+                foreColor: '#94a3b8'
+            },
+            colors: ['#3b82f6', '#8b5cf6', '#f59e0b'],
+            plotOptions: {
+                pie: {
+                    donut: {
+                        size: '75%',
+                        labels: {
+                            show: true,
+                            total: {
+                                show: true,
+                                label: 'Total VMs',
+                                color: '#f8fafc'
+                            }
+                        }
+                    }
+                }
+            },
+            stroke: { show: false },
+            legend: { position: 'bottom' },
+            tooltip: { theme: 'dark' }
+        };
+
+        var donutChart = new ApexCharts(document.querySelector("#donutChart"), donutOptions);
+        donutChart.render();
+    </script>
+</body>
+
+</html>
