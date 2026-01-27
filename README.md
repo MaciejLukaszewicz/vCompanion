@@ -49,7 +49,7 @@ The easiest way to get started is via Git:
 ```powershell
 git clone https://github.com/your-username/vCompanion.git
 cd vCompanion
-.\setup.bat
+.\setup\setup.bat
 ```
 
 ### 2. Configuration
@@ -68,7 +68,7 @@ Edit `config/config.json` to add your vCenter environments:
 
 ### 3. Run
 ```powershell
-.\run.bat
+.\setup\run.bat
 ```
 Visit `http://localhost:8000` to access the dashboard.
 
@@ -77,7 +77,7 @@ Visit `http://localhost:8000` to access the dashboard.
 ## 🔄 Updates
 Keep your installation up-to-date with one command:
 ```powershell
-.\update.bat
+.\setup\update.bat
 ```
 
 ## 📝 Documentation
