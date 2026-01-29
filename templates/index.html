@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,26 +8,47 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
+
 <body class="dark-mode">
     <header>
         <nav>
-            <div class="logo">vCompanion</div>
+            <div class="logo">
+                <i data-lucide="shield-check" style="stroke-width: 3px;"></i>
+                vCompanion
+            </div>
             <ul>
                 <li><a href="/">Dashboard</a></li>
                 <li><a href="/inventory">Inventory</a></li>
                 <li><a href="/reports">Reports</a></li>
             </ul>
+            <div class="user-menu">
+                <i data-lucide="user"></i>
+                <span>{{ username }}</span>
+                <form method="POST" action="/api/auth/logout" style="display: inline;">
+                    <button type="submit" class="btn-logout">
+                        <i data-lucide="log-out"></i>
+                        Logout
+                    </button>
+                </form>
+            </div>
         </nav>
     </header>
     <main id="content">
         {% block content %}
         <h1>Welcome to vCompanion</h1>
-        <p>Unified vSphere Management</p>
+        <p>Unified vSphere Management Dashboard</p>
+        <p>Logged in as: <strong>{{ username }}</strong></p>
+        <p>Dashboard is being built... Authentication is working!</p>
         {% endblock %}
     </main>
     <footer>
         <p>&copy; 2026 vCompanion</p>
     </footer>
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
+
 </html>

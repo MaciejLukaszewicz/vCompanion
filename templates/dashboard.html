@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}vCompanion - Dashboard{% endblock %}
+
+{% block content %}
+<header>
+    <div>
+        <h1>Global Overview</h1>
+        <p style="color: var(--text-dim); font-size: 0.875rem;">
+            Summary across {{ vcenter_count }} connected vCenter environment{{ 's' if vcenter_count != 1 else '' }}
+        </p>
+    </div>
+    <div class="search-bar">
+        <i data-lucide="search" size="18" style="color: var(--text-dim);"></i>
+        <input type="text" placeholder="Search VMs, IPs, Hosts..." hx-get="/api/search"
+            hx-trigger="keyup changed delay:500ms" hx-target="#search-results">
+    </div>
+</header>
+
+<!-- Stats Grid -->
+<section class="stats-grid">
+    <div class="stat-card">
+        <h3>Total Virtual Machines</h3>
+        <div class="value">{{ stats.total_vms | default('--') }}</div>
+        <div class="delta up"><i data-lucide="trending-up"></i> {{ stats.vms_delta | default('Loading...') }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Active Snapshots</h3>
+        <div class="value">{{ stats.snapshots | default('--') }}</div>
+        <div class="delta down"><i data-lucide="trending-down"></i> {{ stats.snapshots_delta | default('Loading...') }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <h3>Host Clusters</h3>
+        <div class="value">{{ stats.clusters | default('--') }}</div>
+        <div class="delta" style="color: var(--text-dim)">{{ stats.clusters_status | default('Loading...') }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Critical Alerts</h3>
+        <div class="value" style="color: var(--danger)">{{ stats.alerts | default('--') }}</div>
+        <div class="delta up" style="color: var(--danger)">{{ stats.alerts_status | default('Loading...') }}</div>
+    </div>
+</section>
+
+<!-- Charts Row -->
+<section class="charts-row">
+    <div class="chart-container">
+        <h2>Resource Consumption (Last 24h)</h2>
+        <div id="mainChart"></div>
+    </div>
+    <div class="chart-container">
+        <h2>VM Distribution by OS</h2>
+        <div id="donutChart"></div>
+    </div>
+</section>
+
+<!-- Recent Events Table -->
+<section class="table-container">
+    <div
+        style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-size: 1rem; font-weight: 600;">Recent Critical Events</h2>
+        <a href="#" style="color: var(--primary); font-size: 0.875rem; text-decoration: none;">View All</a>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Event</th>
+                <th>vCenter</th>
+                <th>Target</th>
+                <th>Status</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if events %}
+            {% for event in events %}
+            <tr>
+                <td>{{ event.description }}</td>
+                <td>{{ event.vcenter }}</td>
+                <td>{{ event.target }}</td>
+                <td><span class="status-badge {{ event.severity }}">{{ event.severity | title }}</span></td>
+                <td>{{ event.time }}</td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 2rem;">
+                    Loading events...
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Main Area Chart - Resource Consumption
+    var areaOptions = {
+        series: [
+            {
+                name: 'CPU Usage %',
+                data: {{ chart_data.cpu | tojson | safe if chart_data else '[45, 52, 38, 45, 19, 23, 31, 28, 43, 62, 58, 41]' }}
+            },
+    {
+        name: 'RAM Usage %',
+            data: { { chart_data.ram | tojson | safe if chart_data else '[72, 68, 65, 75, 82, 85, 78, 80, 77, 73, 75, 71]' } }
+    }
+        ],
+    chart: {
+        height: 300,
+            type: 'area',
+                toolbar: { show: false },
+        background: 'transparent',
+            foreColor: '#94a3b8'
+    },
+    colors: ['#3b82f6', '#8b5cf6'],
+        dataLabels: { enabled: false },
+    stroke: { curve: 'smooth', width: 2 },
+    grid: {
+        borderColor: 'rgba(255, 255, 255, 0.05)',
+            xaxis: { lines: { show: true } }
+    },
+    xaxis: {
+        categories: { { chart_data.time_labels | tojson | safe if chart_data else "['12am', '2am', '4am', '6am', '8am', '10am', '12pm', '2pm', '4pm', '6pm', '8pm', '10pm']" } },
+    },
+    tooltip: { theme: 'dark' },
+    fill: {
+        type: 'gradient',
+            gradient: {
+            shadeIntensity: 1,
+                opacityFrom: 0.4,
+                    opacityTo: 0.1,
+                        stops: [0, 90, 100]
+        }
+    },
+    };
+
+    var mainChart = new ApexCharts(document.querySelector("#mainChart"), areaOptions);
+    mainChart.render();
+
+    // Donut Chart - OS Distribution
+    var donutOptions = {
+        series: {{ os_data.values | tojson | safe if os_data else '[540, 420, 288]' }},
+    labels: { { os_data.labels | tojson | safe if os_data else "['Linux', 'Windows', 'Other']" } },
+    chart: {
+        type: 'donut',
+            height: 300,
+                foreColor: '#94a3b8'
+    },
+    colors: ['#3b82f6', '#8b5cf6', '#f59e0b'],
+        plotOptions: {
+        pie: {
+            donut: {
+                size: '75%',
+                    labels: {
+                    show: true,
+                        total: {
+                        show: true,
+                            label: 'Total VMs',
+                                color: '#f8fafc'
+                    }
+                }
+            }
+        }
+    },
+    stroke: { show: false },
+    legend: { position: 'bottom' },
+    tooltip: { theme: 'dark' }
+    };
+
+    var donutChart = new ApexCharts(document.querySelector("#donutChart"), donutOptions);
+    donutChart.render();
+</script>
+{% endblock %}

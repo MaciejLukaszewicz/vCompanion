@@ -34,33 +34,32 @@ vCompanion is a management tool designed to help administrators oversee multiple
 - **Extensibility**: Future features will be added based on user feedback.
 
 ## 4. Architecture Diagram
-```text
- +---------------------------------------------------------+
- |                      User Browser                       |
- |  (HTMX Dynamic Updates / ApexCharts / Responsive CSS)   |
- +---------------------------+-----------------------------+
-                             |
-                             | HTTP (REST API / HTML)
-                             v
- +---------------------------+-----------------------------+
- |                  vCompanion Application                 |
- |  +---------------------------------------------------+  |
- |  |                  FastAPI Backend                  |  |
- |  | (Session Mgmt / Routing / Jinja2 Template Engine) |  |
- |  +----------+-----------------+------------------+---+  |
- |             |                 |                  |      |
- |             v                 v                  v      |
- |      +------------+    +------------+      +------------+|
- |      | Inventory  |    | Metrics    |      | Reporting  ||
- |      | Service    |    | Service    |      | (Pandas)   ||
- |      +------------+    +------------+      +------------+|
- +-------------+-----------------+------------------+------+
-               |                 |                  |
-               |       pyvmomi (SOAP/HTTPS)         |
-               v                 v                  v
- +-------------+----+      +-----+------+      +-----+----+
- |  vCenter Prod 1  |      |  vCenter DR  |      | vCenter 3|
- +------------------+      +--------------+      +----------+
+
+```mermaid
+graph TD
+    User["User Browser<br/>(HTMX / ApexCharts / CSS)"]
+    
+    subgraph vCompanion ["vCompanion Application"]
+        Backend["FastAPI Backend<br/>(Sessions / Routing / Jinja2)"]
+        
+        Inventory["Inventory Service"]
+        Metrics["Metrics Service"]
+        Reporting["Reporting (Pandas)"]
+        
+        Backend --> Inventory
+        Backend --> Metrics
+        Backend --> Reporting
+    end
+    
+    User -- "HTTP (REST/HTML)" --> Backend
+    
+    Inventory -- "pyvmomi (SOAP/HTTPS)" --> VC1["vCenter Prod 1"]
+    Metrics -- "pyvmomi (SOAP/HTTPS)" --> VC2["vCenter DR"]
+    Reporting -- "pyvmomi (SOAP/HTTPS)" --> VC3["vCenter 3"]
+    
+    style vCompanion fill:#f5f5f5,stroke:#333,stroke-width:2px
+    style Backend fill:#e1f5fe,stroke:#01579b
+    style User fill:#fff9c4,stroke:#fbc02d
 ```
 
 ## 5. Documentation

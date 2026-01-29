@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vCompanion - Login</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo-large">
+                <i data-lucide="shield-check" style="stroke-width: 3px;"></i>
+                <h1>vCompanion</h1>
+            </div>
+            <p class="login-subtitle">Unified vSphere Management Dashboard</p>
+
+            {% if error %}
+            <div class="alert alert-error">
+                <i data-lucide="alert-circle"></i>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/api/auth/login" class="login-form">
+                <div class="form-group">
+                    <label for="username">
+                        <i data-lucide="user"></i>
+                        Username
+                    </label>
+                    <input type="text" id="username" name="username" placeholder="vCenter username" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">
+                        <i data-lucide="lock"></i>
+                        Password
+                    </label>
+                    <input type="password" id="password" name="password" placeholder="vCenter password" required>
+                </div>
+
+                <button type="submit" class="btn-primary">
+                    <i data-lucide="log-in"></i>
+                    Sign In
+                </button>
+            </form>
+
+            <div class="login-info">
+                <i data-lucide="info"></i>
+                <p>Your credentials will be used to authenticate with all configured vCenter servers. Sessions expire
+                    after 1 hour of inactivity.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

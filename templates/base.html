@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}vCompanion{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <!-- Sidebar Navigation -->
+    <aside>
+        <div class="logo">
+            <i data-lucide="shield-check" style="stroke-width: 3px;"></i>
+            vCompanion
+        </div>
+        <nav>
+            <ul>
+                <li><a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">
+                        <i data-lucide="layout-dashboard"></i> Dashboard
+                    </a></li>
+                <li><a href="/inventory" class="{% if active_page == 'inventory' %}active{% endif %}">
+                        <i data-lucide="layers"></i> Inventory
+                    </a></li>
+                <li><a href="/datastores" class="{% if active_page == 'datastores' %}active{% endif %}">
+                        <i data-lucide="database"></i> Datastores
+                    </a></li>
+                <li><a href="/hosts" class="{% if active_page == 'hosts' %}active{% endif %}">
+                        <i data-lucide="server"></i> Hosts
+                    </a></li>
+                <li><a href="/performance" class="{% if active_page == 'performance' %}active{% endif %}">
+                        <i data-lucide="activity"></i> Performance
+                    </a></li>
+                <li><a href="/reports" class="{% if active_page == 'reports' %}active{% endif %}">
+                        <i data-lucide="file-text"></i> Reports
+                    </a></li>
+                <li><a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">
+                        <i data-lucide="settings"></i> Settings
+                    </a></li>
+            </ul>
+        </nav>
+
+        <!-- User info at bottom of sidebar -->
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <i data-lucide="user"></i>
+                <span>{{ username }}</span>
+            </div>
+            <form method="POST" action="/api/auth/logout">
+                <button type="submit" class="btn-logout-sidebar">
+                    <i data-lucide="log-out"></i>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        {% block extra_scripts %} {% endblock %}
+    </script>
+</body>
+
+</html>

@@ -7,6 +7,7 @@ jinja2
 python-dotenv
 pydantic
 pydantic-settings
-htmx-flask  # Note: Actually using FastAPI, so standard HTMX via templates is fine, but jinja2 is needed.
 requests
 pytest
+itsdangerous
+python-multipart
