@@ -12,11 +12,43 @@ class VCenterManager:
     def __init__(self, configs: list[VCenterConfig]):
         self.connections = {cfg.id: VCenterConnection(cfg) for cfg in configs}
 
-    def connect_all(self, user, password):
+    def connect_all(self, user, password, selected_vcenter_ids=None):
+        """
+        Connect to vCenters. If selected_vcenter_ids is provided, only connect to those.
+        Otherwise, connect to all configured vCenters.
+        """
         results = {}
-        for vc_id, conn in self.connections.items():
-            results[vc_id] = conn.connect(user, password)
+        vcenters_to_connect = selected_vcenter_ids if selected_vcenter_ids else self.connections.keys()
+        
+        for vc_id in vcenters_to_connect:
+            if vc_id in self.connections:
+                results[vc_id] = self.connections[vc_id].connect(user, password)
+            else:
+                logger.warning(f"Attempted to connect to unknown vCenter ID: {vc_id}")
+                results[vc_id] = False
+        
         return results
+
+    def connect_selected(self, user, password, vcenter_ids):
+        """
+        Connect to specific vCenters without affecting existing connections.
+        """
+        return self.connect_all(user, password, vcenter_ids)
+
+    def get_connection_status(self):
+        """
+        Get connection status for all configured vCenters.
+        Returns dict with vCenter info and connection state.
+        """
+        status = []
+        for vc_id, conn in self.connections.items():
+            status.append({
+                "id": conn.config.id,
+                "name": conn.config.name,
+                "host": conn.config.host,
+                "connected": conn.service_instance is not None
+            })
+        return status
 
     def disconnect_all(self):
         for conn in self.connections.values():

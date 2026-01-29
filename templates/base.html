@@ -61,12 +61,201 @@
 
     <!-- Main Content Area -->
     <main>
+        <!-- vCenter Status Bar -->
+        {% if vcenter_status %}
+        <div class="vcenter-status-bar">
+            <div class="vcenter-status-container">
+                {% for vc in vcenter_status %}
+                <div class="vcenter-pill {% if vc.connected %}connected{% else %}disconnected{% endif %}"
+                    data-vcenter-id="{{ vc.id }}" {% if not vc.connected %}onclick="openLoginModal('{{ vc.id }}')" {%
+                    endif %}>
+                    <span class="status-indicator"></span>
+                    <span class="vcenter-name">{{ vc.name }}</span>
+                </div>
+                {% endfor %}
+                <button class="btn-login-additional" onclick="openLoginModal()">
+                    <i data-lucide="plus-circle"></i>
+                    Connect More
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
         {% block content %}{% endblock %}
     </main>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeLoginModal()">&times;</span>
+            <h2>Connect to vCenter Servers</h2>
+            <p style="color: var(--text-dim); margin-bottom: 1.5rem;">
+                Log in to additional vCenter servers. Your existing connections will remain active.
+            </p>
+
+            <form id="additionalLoginForm">
+                <div class="form-group">
+                    <label for="modal-username">
+                        <i data-lucide="user"></i>
+                        Username
+                    </label>
+                    <input type="text" id="modal-username" placeholder="vCenter username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-password">
+                        <i data-lucide="lock"></i>
+                        Password
+                    </label>
+                    <input type="password" id="modal-password" placeholder="vCenter password" required>
+                </div>
+
+                <div class="form-group">
+                    <label style="margin-bottom: 0.75rem; display: block;">
+                        <i data-lucide="server"></i>
+                        Select Disconnected vCenters
+                    </label>
+                    <div class="vcenter-list" id="modalVcenterList">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+
+                <div id="modalError" class="alert alert-error" style="display: none;">
+                    <i data-lucide="alert-circle"></i>
+                    <span id="modalErrorText"></span>
+                </div>
+
+                <div id="modalSuccess" class="alert alert-success" style="display: none;">
+                    <i data-lucide="check-circle"></i>
+                    <span id="modalSuccessText"></span>
+                </div>
+
+                <button type="submit" class="btn-primary">
+                    <i data-lucide="log-in"></i>
+                    Connect
+                </button>
+            </form>
+        </div>
+    </div>
 
     <script>
         // Initialize Lucide Icons
         lucide.createIcons();
+
+        // Modal functions
+        function openLoginModal(preselectedVcId = null) {
+            const modal = document.getElementById('loginModal');
+            const vcenterList = document.getElementById('modalVcenterList');
+
+            // Clear previous content
+            vcenterList.innerHTML = '';
+
+            // Get disconnected vCenters from status bar
+            const disconnectedVCs = Array.from(document.querySelectorAll('.vcenter-pill.disconnected'));
+
+            if (disconnectedVCs.length === 0) {
+                vcenterList.innerHTML = '<p style="color: var(--text-dim); font-style: italic;">All vCenters are already connected.</p>';
+            } else {
+                disconnectedVCs.forEach(pill => {
+                    const vcId = pill.getAttribute('data-vcenter-id');
+                    const vcName = pill.querySelector('.vcenter-name').textContent;
+
+                    const checkbox = document.createElement('div');
+                    checkbox.className = 'vcenter-checkbox';
+                    checkbox.innerHTML = `
+                        <input type="checkbox" id="modal_vc_${vcId}" value="${vcId}" ${preselectedVcId === vcId ? 'checked' : ''}>
+                        <label for="modal_vc_${vcId}">
+                            <strong>${vcName}</strong>
+                        </label>
+                    `;
+                    vcenterList.appendChild(checkbox);
+                });
+            }
+
+            // Clear form
+            document.getElementById('modal-username').value = '';
+            document.getElementById('modal-password').value = '';
+            document.getElementById('modalError').style.display = 'none';
+            document.getElementById('modalSuccess').style.display = 'none';
+
+            modal.style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+        }
+
+        // Close modal on outside click
+        window.onclick = function (event) {
+            const modal = document.getElementById('loginModal');
+            if (event.target === modal) {
+                closeLoginModal();
+            }
+        }
+
+        // Handle additional login form submission
+        document.getElementById('additionalLoginForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const username = document.getElementById('modal-username').value;
+            const password = document.getElementById('modal-password').value;
+
+            // Collect selected vCenter IDs
+            const checkboxes = document.querySelectorAll('#modalVcenterList input[type="checkbox"]:checked');
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedIds.length === 0) {
+                showModalError('Please select at least one vCenter server.');
+                return;
+            }
+
+            // Hide previous messages
+            document.getElementById('modalError').style.display = 'none';
+            document.getElementById('modalSuccess').style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+                formData.append('selected_vcenters', selectedIds.join(','));
+
+                const response = await fetch('/api/auth/login-additional', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showModalSuccess(`Successfully connected to ${data.connected.length} vCenter(s)!`);
+
+                    // Wait a moment then reload page to refresh status
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    showModalError(data.error || 'Failed to connect to selected vCenters.');
+                }
+
+            } catch (error) {
+                showModalError('An error occurred: ' + error.message);
+            }
+        });
+
+        function showModalError(message) {
+            const errorDiv = document.getElementById('modalError');
+            document.getElementById('modalErrorText').textContent = message;
+            errorDiv.style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function showModalSuccess(message) {
+            const successDiv = document.getElementById('modalSuccess');
+            document.getElementById('modalSuccessText').textContent = message;
+            successDiv.style.display = 'flex';
+            lucide.createIcons();
+        }
 
         {% block extra_scripts %} {% endblock %}
     </script>

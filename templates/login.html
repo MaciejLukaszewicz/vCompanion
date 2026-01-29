@@ -25,7 +25,7 @@
             </div>
             {% endif %}
 
-            <form method="POST" action="/api/auth/login" class="login-form">
+            <form method="POST" action="/api/auth/login" class="login-form" id="loginForm">
                 <div class="form-group">
                     <label for="username">
                         <i data-lucide="user"></i>
@@ -41,6 +41,26 @@
                     </label>
                     <input type="password" id="password" name="password" placeholder="vCenter password" required>
                 </div>
+
+                <div class="form-group">
+                    <label style="margin-bottom: 0.75rem; display: block;">
+                        <i data-lucide="server"></i>
+                        Select vCenter Servers
+                    </label>
+                    <div class="vcenter-list">
+                        {% for vcenter in vcenters %}
+                        <div class="vcenter-checkbox">
+                            <input type="checkbox" id="vc_{{ vcenter.id }}" value="{{ vcenter.id }}" checked>
+                            <label for="vc_{{ vcenter.id }}">
+                                <strong>{{ vcenter.name }}</strong>
+                                <span class="vcenter-host">{{ vcenter.host }}</span>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <input type="hidden" name="selected_vcenters" id="selectedVcenters">
 
                 <button type="submit" class="btn-primary">
                     <i data-lucide="log-in"></i>
@@ -58,6 +78,26 @@
 
     <script>
         lucide.createIcons();
+
+        // Handle form submission
+        document.getElementById('loginForm').addEventListener('submit', function (e) {
+            // Collect selected vCenter IDs
+            const checkboxes = document.querySelectorAll('.vcenter-checkbox input[type="checkbox"]:checked');
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+
+            // Set hidden field value
+            document.getElementById('selectedVcenters').value = selectedIds.join(',');
+
+            // If no vCenters selected, prevent submission
+            if (selectedIds.length === 0) {
+                e.preventDefault();
+                alert('Please select at least one vCenter server to connect to.');
+                return false;
+            }
+        });
+
+        // Reinitialize icons after any dynamic changes
+        setTimeout(() => lucide.createIcons(), 100);
     </script>
 </body>
 

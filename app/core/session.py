@@ -76,6 +76,27 @@ def get_connected_vcenters(request: Request) -> list[str]:
     return request.session.get(SESSION_KEY_CONNECTED_VCENTERS, [])
 
 
-def set_connected_vcenters(request: Request, vcenter_ids: list[str]):
-    """Store list of connected vCenter IDs in session."""
-    request.session[SESSION_KEY_CONNECTED_VCENTERS] = vcenter_ids
+def set_connected_vcenters(request: Request, vcenter_ids: list[str], merge: bool = False):
+    """
+    Store list of connected vCenter IDs in session.
+    If merge=True, add to existing connections instead of replacing.
+    """
+    if merge:
+        existing = request.session.get(SESSION_KEY_CONNECTED_VCENTERS, [])
+        # Merge and deduplicate
+        combined = list(set(existing + vcenter_ids))
+        request.session[SESSION_KEY_CONNECTED_VCENTERS] = combined
+    else:
+        request.session[SESSION_KEY_CONNECTED_VCENTERS] = vcenter_ids
+
+
+def update_vcenter_status(request: Request, vcenter_id: str, connected: bool):
+    """Update connection status for a specific vCenter."""
+    connected_vcenters = request.session.get(SESSION_KEY_CONNECTED_VCENTERS, [])
+    
+    if connected and vcenter_id not in connected_vcenters:
+        connected_vcenters.append(vcenter_id)
+    elif not connected and vcenter_id in connected_vcenters:
+        connected_vcenters.remove(vcenter_id)
+    
+    request.session[SESSION_KEY_CONNECTED_VCENTERS] = connected_vcenters

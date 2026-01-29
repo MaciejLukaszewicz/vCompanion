@@ -22,19 +22,25 @@ templates = Jinja2Templates(directory="templates")
 async def login(
     request: Request,
     username: str = Form(...),
-    password: str = Form(...)
+    password: str = Form(...),
+    selected_vcenters: str = Form(None)  # Comma-separated vCenter IDs or None for all
 ):
     """
     Authenticate user with vCenter credentials.
-    Attempts to connect to all configured vCenters.
+    Attempts to connect to selected vCenters or all if not specified.
     """
     try:
+        # Parse selected vCenter IDs
+        vcenter_ids = None
+        if selected_vcenters:
+            vcenter_ids = [vc_id.strip() for vc_id in selected_vcenters.split(',') if vc_id.strip()]
+        
         # Create VCenterManager
         vcenter_manager = VCenterManager(settings.vcenters)
         
-        # Attempt to connect to all vCenters
-        logger.info(f"Login attempt for user: {username}")
-        connection_results = vcenter_manager.connect_all(username, password)
+        # Attempt to connect to selected or all vCenters
+        logger.info(f"Login attempt for user: {username}, selected vCenters: {vcenter_ids or 'all'}")
+        connection_results = vcenter_manager.connect_all(username, password, vcenter_ids)
         
         # Check if at least one vCenter connected successfully
         successful_connections = [vc_id for vc_id, success in connection_results.items() if success]
@@ -45,7 +51,8 @@ async def login(
                 "login.html",
                 {
                     "request": request,
-                    "error": "Authentication failed. Could not connect to any vCenter server. Please check your credentials."
+                    "error": "Authentication failed. Could not connect to any vCenter server. Please check your credentials.",
+                    "vcenters": [{"id": vc.id, "name": vc.name, "host": vc.host} for vc in settings.vcenters]
                 }
             )
         
@@ -60,7 +67,7 @@ async def login(
         else:
             logger.info(f"User {username} successfully connected to all {len(successful_connections)} vCenter(s)")
         
-        # Store manager in app state for reuse (we'll implement this pattern)
+        # Store manager in app state for reuse
         request.app.state.vcenter_manager = vcenter_manager
         
         # Redirect to dashboard
@@ -72,7 +79,8 @@ async def login(
             "login.html",
             {
                 "request": request,
-                "error": f"An unexpected error occurred: {str(e)}"
+                "error": f"An unexpected error occurred: {str(e)}",
+                "vcenters": [{"id": vc.id, "name": vc.name, "host": vc.host} for vc in settings.vcenters]
             }
         )
 
@@ -101,6 +109,106 @@ async def logout(request: Request):
     
     # Redirect to login page
     return RedirectResponse(url="/login", status_code=303)
+
+
+@router.post("/login-additional")
+async def login_additional(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    selected_vcenters: str = Form(...)  # Comma-separated vCenter IDs
+):
+    """
+    Login to additional vCenters without affecting existing connections.
+    """
+    try:
+        # Check if already authenticated
+        if not is_authenticated(request):
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated"},
+                status_code=401
+            )
+        
+        # Parse selected vCenter IDs
+        vcenter_ids = [vc_id.strip() for vc_id in selected_vcenters.split(',') if vc_id.strip()]
+        
+        if not vcenter_ids:
+            return JSONResponse(
+                {"success": False, "error": "No vCenters selected"},
+                status_code=400
+            )
+        
+        # Get or create VCenterManager
+        if not hasattr(request.app.state, 'vcenter_manager'):
+            request.app.state.vcenter_manager = VCenterManager(settings.vcenters)
+        
+        vcenter_manager = request.app.state.vcenter_manager
+        
+        # Connect to selected vCenters
+        logger.info(f"Additional login attempt for user: {username}, vCenters: {vcenter_ids}")
+        connection_results = vcenter_manager.connect_selected(username, password, vcenter_ids)
+        
+        # Update session with new connections
+        successful_connections = [vc_id for vc_id, success in connection_results.items() if success]
+        if successful_connections:
+            set_connected_vcenters(request, successful_connections, merge=True)
+            logger.info(f"User {username} connected to {len(successful_connections)} additional vCenter(s)")
+        
+        # Get updated status
+        status = vcenter_manager.get_connection_status()
+        
+        return JSONResponse({
+            "success": len(successful_connections) > 0,
+            "connected": successful_connections,
+            "failed": [vc_id for vc_id, success in connection_results.items() if not success],
+            "status": status
+        })
+        
+    except Exception as e:
+        logger.error(f"Additional login error: {str(e)}")
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
+@router.get("/vcenter-status")
+async def vcenter_status(request: Request):
+    """
+    Get connection status for all configured vCenters.
+    """
+    try:
+        if not is_authenticated(request):
+            return JSONResponse(
+                {"authenticated": False},
+                status_code=401
+            )
+        
+        # Get connected vCenter IDs from session
+        connected_ids = get_session_credentials(request)
+        connected_vcenter_ids = request.session.get("connected_vcenters", [])
+        
+        # Build status list
+        status = []
+        for vc in settings.vcenters:
+            status.append({
+                "id": vc.id,
+                "name": vc.name,
+                "host": vc.host,
+                "connected": vc.id in connected_vcenter_ids
+            })
+        
+        return JSONResponse({
+            "authenticated": True,
+            "vcenters": status
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting vCenter status: {str(e)}")
+        return JSONResponse(
+            {"error": str(e)},
+            status_code=500
+        )
 
 
 @router.get("/status")

@@ -36,6 +36,17 @@ app.include_router(dashboard.router)
 
 
 
+def get_vcenter_status(request: Request):
+    """Helper to get vCenter connection status for templates."""
+    connected_ids = request.session.get("connected_vcenters", [])
+    return [{
+        "id": vc.id,
+        "name": vc.name,
+        "host": vc.host,
+        "connected": vc.id in connected_ids
+    } for vc in settings.vcenters]
+
+
 @app.get("/login")
 async def login_page(request: Request):
     """Display login page."""
@@ -43,7 +54,10 @@ async def login_page(request: Request):
     if is_authenticated(request):
         return RedirectResponse(url="/", status_code=303)
     
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "vcenters": [{"id": vc.id, "name": vc.name, "host": vc.host} for vc in settings.vcenters]
+    })
 
 
 @app.get("/")
@@ -107,6 +121,7 @@ async def index(request: Request):
         "username": request.session.get("username"),
         "active_page": "dashboard",
         "vcenter_count": len(settings.vcenters),
+        "vcenter_status": get_vcenter_status(request),
         "stats": stats,
         "events": events
     })
@@ -122,7 +137,8 @@ async def inventory(request: Request):
     return templates.TemplateResponse("inventory.html", {
         "request": request,
         "username": request.session.get("username"),
-        "active_page": "inventory"
+        "active_page": "inventory",
+        "vcenter_status": get_vcenter_status(request)
     })
 
 
@@ -135,7 +151,8 @@ async def reports(request: Request):
     return templates.TemplateResponse("reports.html", {
         "request": request,
         "username": request.session.get("username"),
-        "active_page": "reports"
+        "active_page": "reports",
+        "vcenter_status": get_vcenter_status(request)
     })
 
 
