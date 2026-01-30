@@ -258,7 +258,14 @@ async def restore_session(request: Request):
         request.app.state.vcenter_manager = VCenterManager(settings.vcenters)
     
     vcenter_manager = request.app.state.vcenter_manager
-    vcenter_manager.connect_all(username, password, vcenter_ids)
+    results = vcenter_manager.connect_all(username, password, vcenter_ids)
+    
+    # Update session with actually connected vCenters
+    successful_vcs = [vc_id for vc_id, success in results.items() if success]
+    set_connected_vcenters(request, successful_vcs)
+    
+    if not successful_vcs:
+        logger.warning(f"Session restoration failed for user {username}: No vCenter connected.")
     
     # Return redirect header for HTMX
     return Response(headers={"HX-Redirect": "/"})

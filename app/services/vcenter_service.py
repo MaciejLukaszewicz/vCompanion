@@ -46,7 +46,7 @@ class VCenterManager:
                 "id": conn.config.id,
                 "name": conn.config.name,
                 "host": conn.config.host,
-                "connected": conn.service_instance is not None
+                "connected": conn.is_alive()
             })
         return status
 
@@ -93,17 +93,52 @@ class VCenterManager:
         return all_snapshots
 
     def get_stats(self):
-        """Get aggregated statistics across all vCenters."""
-        vms = self.get_all_vms()
-        snapshots = self.get_all_snapshots(vms=vms)
-        hosts = self.get_all_hosts()
+        """Get aggregated and per-vCenter statistics."""
+        per_vcenter = {}
+        all_vms = []
+        all_hosts = []
         
-        # Count VMs by power state
-        powered_on = sum(1 for vm in vms if vm.get('power_state') == 'poweredOn')
+        for vc_id, conn in self.connections.items():
+            alive = conn.is_alive()
+            
+            # Default "N/A" state
+            per_vcenter[vc_id] = {
+                "name": conn.config.name,
+                "connected": alive,
+                "vms": "N/A",
+                "vms_on": 0,
+                "snapshots": "N/A",
+                "hosts": "N/A"
+            }
+            
+            if not alive:
+                continue
+            
+            try:
+                vc_vms = conn.get_vms()
+                vc_hosts = conn.get_hosts()
+                vc_snapshots = [vm for vm in vc_vms if vm.get('snapshot_count', 0) > 0]
+                vc_powered_on = sum(1 for vm in vc_vms if vm.get('power_state') == 'poweredOn')
+                
+                per_vcenter[vc_id].update({
+                    "vms": len(vc_vms),
+                    "vms_on": vc_powered_on,
+                    "snapshots": len(vc_snapshots),
+                    "hosts": len(vc_hosts)
+                })
+                
+                all_vms.extend(vc_vms)
+                all_hosts.extend(vc_hosts)
+            except Exception as e:
+                logger.error(f"Error fetching detailed stats from {conn.config.name}: {str(e)}")
+
+        # Count total VMs by power state
+        powered_on = sum(v['vms_on'] for v in per_vcenter.values())
+        total_snapshots = sum(v['snapshots'] if isinstance(v['snapshots'], int) else 0 for v in per_vcenter.values())
         
-        # Count by OS
+        # Count by OS for all VMs
         os_counts = {}
-        for vm in vms:
+        for vm in all_vms:
             guest_os = vm.get('guest_os', 'Unknown')
             if 'Windows' in guest_os or 'windows' in guest_os:
                 os_counts['Windows'] = os_counts.get('Windows', 0) + 1
@@ -112,12 +147,17 @@ class VCenterManager:
             else:
                 os_counts['Other'] = os_counts.get('Other', 0) + 1
         
+        # Determine if we have any successful data
+        has_any_connected = any(v['connected'] for v in per_vcenter.values())
+
         return {
-            "total_vms": len(vms),
+            "total_vms": len(all_vms) if has_any_connected else "N/A",
             "powered_on_vms": powered_on,
-            "snapshot_count": len(snapshots),
-            "host_count": len(hosts),
-            "os_distribution": os_counts
+            "snapshot_count": total_snapshots if has_any_connected else "N/A",
+            "host_count": len(all_hosts) if has_any_connected else "N/A",
+            "os_distribution": os_counts,
+            "per_vcenter": per_vcenter,
+            "has_data": has_any_connected
         }
 
 class VCenterConnection:
@@ -125,6 +165,20 @@ class VCenterConnection:
         self.config = config
         self.service_instance = None
         self.content = None
+
+    def is_alive(self):
+        """Check if the connection is still active and responding."""
+        if not self.service_instance:
+            return False
+        try:
+            # CurrentTime() is a lightweight call to verify session
+            self.service_instance.CurrentTime()
+            return True
+        except:
+            # If call fails, session is likely dead or timed out
+            self.service_instance = None
+            self.content = None
+            return False
 
     def connect(self, user, password):
         """Connects to the vCenter server."""

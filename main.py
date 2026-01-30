@@ -42,6 +42,11 @@ app.include_router(dashboard.router)
 
 def get_vcenter_status(request: Request):
     """Helper to get vCenter connection status for templates."""
+    # If manager exists, get real-time status
+    if hasattr(request.app.state, 'vcenter_manager'):
+        return request.app.state.vcenter_manager.get_connection_status()
+    
+    # Otherwise fallback to session-based status (e.g. before reconnection)
     connected_ids = request.session.get("connected_vcenters", [])
     return [{
         "id": vc.id,
@@ -106,16 +111,17 @@ async def index(request: Request):
         if hasattr(request.app.state, 'vcenter_manager'):
             vcenter_manager = request.app.state.vcenter_manager
             stats_data = vcenter_manager.get_stats()
+            has_data = stats_data.get('has_data', False)
             
             stats = {
-                'total_vms': f"{stats_data['total_vms']:,}",
-                'vms_delta': f"{stats_data['powered_on_vms']} powered on",
+                'total_vms': f"{stats_data['total_vms']:,}" if isinstance(stats_data['total_vms'], int) else stats_data['total_vms'],
+                'vms_delta': f"{stats_data['powered_on_vms']} powered on" if has_data else "No data",
                 'snapshots': str(stats_data['snapshot_count']),
-                'snapshots_delta': f"{stats_data['snapshot_count']} active",
+                'snapshots_delta': f"{stats_data['snapshot_count']} active" if has_data else "No data",
                 'clusters': str(stats_data['host_count']),
-                'clusters_status': f"{stats_data['host_count']} host(s)",
-                'alerts': '0',
-                'alerts_status': 'No critical alerts'
+                'clusters_status': f"{stats_data['host_count']} host(s)" if has_data else "No data",
+                'alerts': '0' if has_data else "N/A",
+                'alerts_status': 'No critical alerts' if has_data else "No data"
             }
             
             # Populate real chart data
@@ -151,6 +157,7 @@ async def index(request: Request):
         "vcenter_count": len(settings.vcenters),
         "vcenter_status": get_vcenter_status(request),
         "stats": stats,
+        "per_vcenter_stats": stats_data.get('per_vcenter', {}) if 'stats_data' in locals() else {},
         "events": events,
         "chart_data": chart_data,
         "os_data": os_data
