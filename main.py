@@ -9,6 +9,7 @@ from app.core.config import settings
 import uvicorn
 import secrets
 import logging
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(
@@ -24,11 +25,14 @@ app = FastAPI(title="vCompanion")
 SECRET_KEY = secrets.token_urlsafe(32)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
+# Resolve base directory
+BASE_DIR = Path(__file__).resolve().parent
+
 # Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 # Templates
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 # Include routers
 app.include_router(auth.router)
