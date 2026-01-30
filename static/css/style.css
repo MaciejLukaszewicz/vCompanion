@@ -100,11 +100,24 @@ nav a.active {
     gap: 0.5rem;
     color: var(--text-dim);
     font-size: 0.875rem;
+    max-width: 180px;
+    overflow: hidden;
 }
 
-.user-info i {
-    width: 16px;
-    height: 16px;
+.user-info span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-info i,
+.user-info svg {
+    width: 16px !important;
+    min-width: 16px !important;
+    height: 16px !important;
+    min-height: 16px !important;
+    display: block !important;
+    visibility: visible !important;
 }
 
 .btn-logout-sidebar {
@@ -125,9 +138,12 @@ nav a.active {
     border-color: var(--danger);
 }
 
-.btn-logout-sidebar i {
-    width: 16px;
-    height: 16px;
+.btn-logout-sidebar i,
+.btn-logout-sidebar svg {
+    width: 18px !important;
+    height: 18px !important;
+    display: block !important;
+    visibility: visible !important;
 }
 
 
@@ -706,6 +722,7 @@ tr:last-child td {
         opacity: 0;
         transform: translateY(-30px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -795,6 +812,55 @@ tr:last-child td {
 .modal-content::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 4px;
+}
+
+/* Loading State */
+.hidden {
+    display: none !important;
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 0;
+    gap: 1.5rem;
+}
+
+.spinner {
+    width: 64px;
+    height: 64px;
+    border: 4px solid var(--border);
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    filter: drop-shadow(0 0 10px var(--primary-glow));
+}
+
+.loading-text {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-main);
+    letter-spacing: 0.025em;
+}
+
+.loading-subtext {
+    font-size: 0.875rem;
+    color: var(--text-dim);
+    text-align: center;
+    max-width: 250px;
+    line-height: 1.5;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .modal-content::-webkit-scrollbar-thumb:hover {

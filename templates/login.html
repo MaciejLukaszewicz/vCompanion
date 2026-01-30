@@ -27,6 +27,7 @@
             {% endif %}
 
             <form method="POST" action="/api/auth/login" class="login-form" id="loginForm">
+                <!-- ... form contents ... -->
                 <div class="form-group">
                     <label for="username">
                         <i data-lucide="user"></i>
@@ -69,7 +70,15 @@
                 </button>
             </form>
 
-            <div class="login-info">
+            <div id="loadingState" class="loading-container hidden">
+                <div class="spinner"></div>
+                <div style="text-align: center;">
+                    <div class="loading-text">Connecting...</div>
+                    <div class="loading-subtext">Establishing secure connection to vCenter environments</div>
+                </div>
+            </div>
+
+            <div class="login-info" id="loginInfo">
                 <i data-lucide="info"></i>
                 <p>Your credentials will be used to authenticate with all configured vCenter servers. Sessions expire
                     after 1 hour of inactivity.</p>
@@ -95,6 +104,13 @@
                 alert('Please select at least one vCenter server to connect to.');
                 return false;
             }
+
+            // Hide form and show loading state
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('loginInfo').classList.add('hidden');
+            document.getElementById('loadingState').classList.remove('hidden');
+            
+            // Allow form to submit naturally
         });
 
         // Reinitialize icons after any dynamic changes

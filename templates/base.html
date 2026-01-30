@@ -7,9 +7,9 @@
     <title>{% block title %}vCompanion{% endblock %}</title>
     <link rel="icon" href="/static/favicon.png" type="image/png">
     <link rel="stylesheet" href="/static/css/style.css">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/lucide@latest" crossorigin="anonymous"></script>
     {% block extra_head %}{% endblock %}
 </head>
 
@@ -47,6 +47,7 @@
         </nav>
 
         <!-- User info at bottom of sidebar -->
+        {% if username %}
         <div class="sidebar-footer">
             <div class="user-info">
                 <i data-lucide="user"></i>
@@ -58,6 +59,7 @@
                 </button>
             </form>
         </div>
+        {% endif %}
     </aside>
 
     <!-- Main Content Area -->
@@ -140,9 +142,6 @@
     </div>
 
     <script>
-        // Initialize Lucide Icons
-        lucide.createIcons();
-
         // Modal functions
         function openLoginModal(preselectedVcId = null) {
             const modal = document.getElementById('loginModal');
@@ -180,7 +179,7 @@
             document.getElementById('modalSuccess').style.display = 'none';
 
             modal.style.display = 'flex';
-            lucide.createIcons();
+            refreshIcons();
         }
 
         function closeLoginModal() {
@@ -248,18 +247,31 @@
             const errorDiv = document.getElementById('modalError');
             document.getElementById('modalErrorText').textContent = message;
             errorDiv.style.display = 'flex';
-            lucide.createIcons();
+            refreshIcons();
         }
 
         function showModalSuccess(message) {
             const successDiv = document.getElementById('modalSuccess');
             document.getElementById('modalSuccessText').textContent = message;
             successDiv.style.display = 'flex';
-            lucide.createIcons();
+            refreshIcons();
+        }
+        function refreshIcons() {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
         }
 
-        {% block extra_scripts %} {% endblock %}
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshIcons();
+            setTimeout(refreshIcons, 100);
+            setTimeout(refreshIcons, 500); // Extra safety
+        });
+
+        // Refresh icons after HTMX content updates
+        document.body.addEventListener('htmx:afterOnLoad', refreshIcons);
     </script>
+    {% block extra_scripts %} {% endblock %}
 </body>
 
 </html>

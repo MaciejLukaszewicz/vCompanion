@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from app.api import auth, dashboard
-from app.core.session import is_authenticated
+from app.core.session import is_authenticated, get_session_credentials
 from app.core.config import settings
 import uvicorn
 import secrets
@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="vCompanion")
 
 # Add session middleware
-# In production, use a secure secret key from environment variable
-SECRET_KEY = secrets.token_urlsafe(32)
+# Using a fixed secret key to prevent session invalidation during dev reloads
+SECRET_KEY = "vcompanion-secret-key-change-this-in-production"
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # Resolve base directory
@@ -85,8 +85,24 @@ async def index(request: Request):
     
     events = []
     
+    # Prepare chart/OS data with defaults
+    chart_data = {
+        "cpu": [45, 52, 38, 45, 19, 23, 31, 28, 43, 62, 58, 41],
+        "ram": [72, 68, 65, 75, 82, 85, 78, 80, 77, 73, 75, 71],
+        "time_labels": ['12am', '2am', '4am', '6am', '8am', '10am', '12pm', '2pm', '4pm', '6pm', '8pm', '10pm']
+    }
+    os_data = {
+        "labels": ['Linux', 'Windows', 'Other'],
+        "values": [540, 420, 288]
+    }
+    
     # Try to load real data
     try:
+        # If manager is missing but we have a session, redirect to restoring page
+        if not hasattr(request.app.state, 'vcenter_manager'):
+            if is_authenticated(request):
+                return RedirectResponse(url="/restoring", status_code=303)
+
         if hasattr(request.app.state, 'vcenter_manager'):
             vcenter_manager = request.app.state.vcenter_manager
             stats_data = vcenter_manager.get_stats()
@@ -102,7 +118,15 @@ async def index(request: Request):
                 'alerts_status': 'No critical alerts'
             }
             
-            # Add a simple event
+            # Populate real chart data
+            os_dist = stats_data.get('os_distribution', {})
+            if os_dist:
+                os_data = {
+                    "labels": list(os_dist.keys()),
+                    "values": list(os_dist.values())
+                }
+            
+            # Add a success event
             events = [{
                 'description': 'vCenter data loaded successfully',
                 'vcenter': 'System',
@@ -113,7 +137,7 @@ async def index(request: Request):
     except Exception as e:
         logger.error(f"Error loading vCenter data: {str(e)}")
         events = [{
-            'description': 'Error loading vCenter data',
+            'description': f"Error: {str(e)}",
             'vcenter': 'System',
             'target': 'Dashboard',
             'severity': 'warning',
@@ -127,9 +151,22 @@ async def index(request: Request):
         "vcenter_count": len(settings.vcenters),
         "vcenter_status": get_vcenter_status(request),
         "stats": stats,
-        "events": events
+        "events": events,
+        "chart_data": chart_data,
+        "os_data": os_data
     })
 
+
+
+@app.get("/restoring")
+async def restoring(request: Request):
+    """Loading page for session restoration."""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse("restoring.html", {
+        "request": request,
+        "username": request.session.get("username")
+    })
 
 
 @app.get("/inventory")

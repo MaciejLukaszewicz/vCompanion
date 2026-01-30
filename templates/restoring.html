@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Restoring Session - vCompanion{% endblock %}
+
+{% block extra_head %}
+<style>
+    .restoring-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 60vh;
+        gap: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="restoring-box" hx-post="/api/auth/restore-session" hx-trigger="load" hx-swap="none">
+    <div class="spinner"></div>
+    <div style="text-align: center;">
+        <h2 style="margin-bottom: 0.5rem;">Restoring Session</h2>
+        <p style="color: var(--text-dim);">Reconnecting to configured vCenter servers...</p>
+    </div>
+</div>
+{% endblock %}

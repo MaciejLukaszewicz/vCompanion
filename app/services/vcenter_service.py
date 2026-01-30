@@ -81,8 +81,11 @@ class VCenterManager:
                 all_datastores.extend(conn.get_datastores())
         return all_datastores
 
-    def get_all_snapshots(self):
-        """Get all VMs with snapshots from all vCenters."""
+    def get_all_snapshots(self, vms=None):
+        """Get all VMs with snapshots from all vCenters. If vms list is provided, use it."""
+        if vms:
+            return [vm for vm in vms if vm.get('snapshot_count', 0) > 0]
+            
         all_snapshots = []
         for conn in self.connections.values():
             if conn.service_instance:
@@ -92,7 +95,7 @@ class VCenterManager:
     def get_stats(self):
         """Get aggregated statistics across all vCenters."""
         vms = self.get_all_vms()
-        snapshots = self.get_all_snapshots()
+        snapshots = self.get_all_snapshots(vms=vms)
         hosts = self.get_all_hosts()
         
         # Count VMs by power state
@@ -300,11 +303,11 @@ class VCenterConnection:
             logger.error(f"Error retrieving datastores from {self.config.name}: {str(e)}")
             return []
 
-    def get_snapshots(self):
-        """Get all VMs with active snapshots."""
+    def get_snapshots(self, vms=None):
+        """Get all VMs with active snapshots. If vms list is provided, use it."""
         if not self.content:
             return []
         
-        vms = self.get_vms()
-        return [vm for vm in vms if vm.get('snapshot_count', 0) > 0]
+        target_vms = vms if vms is not None else self.get_vms()
+        return [vm for vm in target_vms if vm.get('snapshot_count', 0) > 0]
 

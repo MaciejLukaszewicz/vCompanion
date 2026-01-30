@@ -10,12 +10,16 @@ from app.core.session import (
 )
 from app.core.config import settings
 from app.services.vcenter_service import VCenterManager
+from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
-templates = Jinja2Templates(directory="templates")
+
+# Resolve templates directory relative to project root
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 @router.post("/login")
@@ -64,8 +68,6 @@ async def login(
         failed_connections = [vc_id for vc_id, success in connection_results.items() if not success]
         if failed_connections:
             logger.warning(f"User {username} connected to {len(successful_connections)} vCenter(s), but failed to connect to: {', '.join(failed_connections)}")
-        else:
-            logger.info(f"User {username} successfully connected to all {len(successful_connections)} vCenter(s)")
         
         # Store manager in app state for reuse
         request.app.state.vcenter_manager = vcenter_manager
@@ -231,3 +233,32 @@ async def auth_status(request: Request):
     return JSONResponse({
         "authenticated": False
     })
+
+
+@router.post("/restore-session")
+async def restore_session(request: Request):
+    """
+    Restore vCenter connections based on session credentials.
+    Called by the 'restoring' page via HTMX.
+    """
+    if not is_authenticated(request):
+        return Response(headers={"HX-Redirect": "/login"})
+    
+    credentials = get_session_credentials(request)
+    if not credentials:
+        return Response(headers={"HX-Redirect": "/login"})
+    
+    username, password = credentials
+    vcenter_ids = request.session.get("connected_vcenters", [])
+    
+    logger.info(f"Restoring session connections for user: {username}")
+    
+    # Initialize manager if needed
+    if not hasattr(request.app.state, 'vcenter_manager'):
+        request.app.state.vcenter_manager = VCenterManager(settings.vcenters)
+    
+    vcenter_manager = request.app.state.vcenter_manager
+    vcenter_manager.connect_all(username, password, vcenter_ids)
+    
+    # Return redirect header for HTMX
+    return Response(headers={"HX-Redirect": "/"})

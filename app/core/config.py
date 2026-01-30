@@ -16,7 +16,7 @@ class AppSettings(BaseModel):
     log_level: str = "INFO"
 
 class Config(BaseModel):
-    app_settings: AppSettings
+    app_settings: AppSettings = AppSettings()
     vcenters: List[VCenterConfig]
 
 def load_config(path: str = None) -> Config:
