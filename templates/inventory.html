@@ -1,20 +1,258 @@
 {% extends "base.html" %}
 
-{% block title %}Inventory - vCompanion{% endblock %}
+{% block title %}vCompanion - Inventory{% endblock %}
 
 {% block content %}
 <header>
     <div>
-        <h1>Virtual Machine Inventory</h1>
-        <p style="color: var(--text-dim); font-size: 0.875rem;">
-            Browse and manage VMs across all vCenter environments
+        <h1>Infrastructure Inventory</h1>
+        <p style="color: var(--text-dim); font-size: 0.875rem;">Manage and explore your virtual infrastructure objects
         </p>
     </div>
 </header>
 
-<section style="padding: 2rem; text-align: center;">
-    <i data-lucide="layers" style="width: 64px; height: 64px; color: var(--text-dim); margin-bottom: 1rem;"></i>
-    <h2>Inventory Coming Soon</h2>
-    <p style="color: var(--text-dim);">This feature is under development.</p>
-</section>
+<div class="inventory-container" style="display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1rem;">
+    <!-- VMs Section -->
+    <section class="table-container" id="vms-section">
+        <div
+            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+            <div style="display: flex; align-items: center; gap: 2rem; flex: 1;">
+                <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; white-space: nowrap; cursor: pointer; user-select: none;"
+                    onclick="toggleInventorySection('vms-content', 'vms-toggle-icon')">
+                    <i data-lucide="monitor" size="18" style="color: var(--primary);"></i> Virtual Machines
+                </h2>
+
+                <!-- Filters Bar -->
+                <form id="vm-filters"
+                    style="display: flex; align-items: center; gap: 1.5rem; flex: 1; max-width: 800px;"
+                    hx-get="/api/inventory/vms" hx-target="#vm-list-target"
+                    hx-trigger="change, keyup delay:300ms from:#vm-search">
+
+                    <!-- Global Search -->
+                    <div style="position: relative; flex: 1;">
+                        <i data-lucide="search" size="14"
+                            style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-dim);"></i>
+                        <input type="text" id="vm-search" name="q"
+                            placeholder="Search by Name, IP, vCenter, Host, Snapshot..."
+                            style="width: 100%; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 2.5rem 0.4rem 2.25rem; font-size: 0.85rem; color: var(--text-main);">
+                        <!-- Clear Search Button -->
+                        <div id="clear-search" onclick="clearVmSearch()"
+                            style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); cursor: pointer; display: none; padding: 2px;">
+                            <i data-lucide="x" size="14"></i>
+                        </div>
+                    </div>
+
+                    <!-- Snapshots Filter (Styled Switch) -->
+                    <label
+                        style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;">
+                        <div class="switch">
+                            <input type="checkbox" name="snaps_only" value="true" hx-trigger="change">
+                            <span class="slider"></span>
+                        </div>
+                        <span style="font-size: 0.85rem; color: var(--text-dim);">Snapshots only</span>
+                    </label>
+                </form>
+            </div>
+
+            <div id="vms-toggle-icon"
+                style="transition: transform 0.3s ease; transform: rotate(180deg); cursor: pointer;"
+                onclick="toggleInventorySection('vms-content', 'vms-toggle-icon')">
+                <i data-lucide="chevron-down"></i>
+            </div>
+        </div>
+
+        <div id="vms-content" style="display: flex; height: 600px; border-top: none;">
+            <!-- Left Side: VM List -->
+            <div class="inventory-list-pane" style="flex: 1; border-right: 1px solid var(--border); overflow-y: auto;">
+                <div id="vm-list-target" hx-get="/api/inventory/vms" hx-trigger="load, vcenter-refreshed from:body">
+                    <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
+                        <div class="spinner-small" style="margin-bottom: 1rem;"></div>
+                        Loading virtual machines...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: VM Details -->
+            <div class="inventory-details-pane" id="vm-details-panel"
+                style="flex: 1.2; background: rgba(0,0,0,0.1); overflow-y: auto;">
+                <div
+                    style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); padding: 2rem; text-align: center;">
+                    <i data-lucide="info" size="48" style="margin-bottom: 1rem; opacity: 0.2;"></i>
+                    <p>Select a virtual machine to view detailed information, networks, and snapshots.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Hosts Section -->
+    <section class="table-container" id="hosts-section">
+        <div onclick="toggleInventorySection('hosts-content', 'hosts-toggle-icon')"
+            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02);">
+            <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem;">
+                <i data-lucide="server" size="18" style="color: var(--warning);"></i> ESXi Hosts
+            </h2>
+            <div id="hosts-toggle-icon" style="transition: transform 0.3s ease;">
+                <i data-lucide="chevron-down"></i>
+            </div>
+        </div>
+        <div id="hosts-content" style="display: none; padding: 0;" hx-get="/api/inventory/hosts" hx-trigger="load"
+            hx-target="#host-list-target">
+            <div id="host-list-target">
+                <div style="padding: 2rem; text-align: center; color: var(--text-dim);">Loading hosts...</div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<style>
+    .inventory-list-table tr {
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .inventory-list-table tr:hover {
+        background: rgba(var(--primary-rgb), 0.05) !important;
+    }
+
+    .inventory-list-table tr.selected {
+        background: rgba(var(--primary-rgb), 0.1) !important;
+        border-left: 3px solid var(--primary);
+    }
+
+    .detail-section {
+        margin-bottom: 2rem;
+    }
+
+    .detail-section h4 {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        letter-spacing: 0.05em;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .info-item label {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        margin-bottom: 0.25rem;
+    }
+
+    .info-item span {
+        font-weight: 500;
+        font-size: 0.935rem;
+    }
+
+    .spinner-small {
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--border);
+        border-top: 2px solid var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+
+    /* Modern Switch Styling */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 32px;
+        height: 18px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--border);
+        transition: .3s;
+        border-radius: 18px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 12px;
+        width: 12px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+    }
+
+    input:checked+.slider {
+        background-color: var(--primary);
+    }
+
+    input:focus+.slider {
+        box-shadow: 0 0 1px var(--primary);
+    }
+
+    input:checked+.slider:before {
+        transform: translateX(14px);
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function toggleInventorySection(contentId, iconId) {
+        const content = document.getElementById(contentId);
+        const icon = document.getElementById(iconId);
+
+        if (content.style.display === 'none') {
+            content.style.display = contentId === 'vms-content' ? 'flex' : 'block';
+            icon.style.transform = 'rotate(180deg)';
+        } else {
+            content.style.display = 'none';
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    // Handle selection highlighting
+    document.addEventListener('click', function (e) {
+        const row = e.target.closest('.vm-row');
+        if (row) {
+            document.querySelectorAll('.vm-row').forEach(r => r.classList.remove('selected'));
+            row.classList.add('selected');
+        }
+    });
+
+    // Handle clear search
+    const searchInput = document.getElementById('vm-search');
+    const clearBtn = document.getElementById('clear-search');
+
+    searchInput.addEventListener('input', function () {
+        clearBtn.style.display = this.value ? 'block' : 'none';
+    });
+
+    function clearVmSearch() {
+        searchInput.value = '';
+        clearBtn.style.display = 'none';
+        // Manually trigger HTMX update
+        htmx.trigger('#vm-search', 'keyup');
+    }
+
+    lucide.createIcons();
+</script>
 {% endblock %}

@@ -1,0 +1,63 @@
+<table class="inventory-list-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>vCenter</th>
+            <th>Primary IP</th>
+            <th>Status</th>
+            <th>Snaps</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if vms %}
+        {% set last_vc = {'id': ''} %}
+        {% set row_alt = {'state': False} %}
+
+        {% for vm in vms %}
+        {# Change color/alternation when vCenter changes #}
+        {% if vm.vcenter_id != last_vc.id %}
+        {% if last_vc.update({'id': vm.vcenter_id}) %}{% endif %}
+        {% if row_alt.update({'state': not row_alt.state}) %}{% endif %}
+        {% endif %}
+
+        <tr class="vm-row {{ 'vcenter-alt' if row_alt.state else '' }}"
+            hx-get="/api/inventory/vm-details/{{ vm.vcenter_id }}/{{ vm.id }}" hx-target="#vm-details-panel"
+            hx-trigger="click">
+            <td style="font-weight: 600; color: var(--text-main);">{{ vm.name }}</td>
+            <td style="font-size: 0.75rem; color: var(--text-dim);">{{ vm.vcenter_name }}</td>
+            <td style="font-family: monospace; font-size: 0.85rem;">{{ vm.ip or '--' }}</td>
+            <td>
+                <span class="status-badge {{ 'success' if vm.power_state == 'poweredOn' else 'dim' }}"
+                    style="font-size: 0.65rem;">
+                    {{ 'ON' if vm.power_state == 'poweredOn' else 'OFF' }}
+                </span>
+            </td>
+            <td style="text-align: center;">
+                {% if vm.snapshot_count > 0 %}
+                <span
+                    style="background: rgba(var(--primary-rgb), 0.1); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                    {{ vm.snapshot_count }}
+                </span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+            <td colspan="5" style="text-align: center; padding: 4rem; color: var(--text-dim);">
+                No virtual machines found in cache.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<style>
+    .vm-row.vcenter-alt {
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .vm-row.vcenter-alt:hover {
+        background: rgba(var(--primary-rgb), 0.08) !important;
+    }
+</style>

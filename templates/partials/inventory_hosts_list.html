@@ -1,0 +1,26 @@
+<table>
+    <thead>
+        <tr>
+            <th>Host Name</th>
+            <th>vCenter</th>
+            <th>MOID</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if hosts %}
+        {% for host in hosts %}
+        <tr>
+            <td style="font-weight: 600;">{{ host.name }}</td>
+            <td style="color: var(--text-dim);">{{ host.vcenter_id }}</td>
+            <td style="font-family: monospace; font-size: 0.8rem;">{{ host.mo_id }}</td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+            <td colspan="3" style="text-align: center; padding: 3rem; color: var(--text-dim);">
+                No hosts found in cache.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>

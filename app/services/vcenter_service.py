@@ -73,13 +73,13 @@ class VCenterManager:
             self.cache.update_vcenter_status(vc_id, conn.config.name, 'REFRESHING')
             logger.info(f"===> [{conn.config.name}] Starting REFRESH")
             
-            # 1. Fetch VMs & Snapshots
-            vms = conn.get_vms_speed()
-            self.cache.save_vms(vc_id, vms)
-            
-            # 2. Fetch Hosts
+            # 1. Fetch Hosts (needed for VM host resolving)
             hosts = conn.get_hosts_speed()
             self.cache.save_hosts(vc_id, hosts)
+            
+            # 2. Fetch VMs & Snapshots (detailed)
+            vms = conn.get_vms_speed(hosts)
+            self.cache.save_vms(vc_id, vms)
             
             # 3. Fetch Alerts
             alerts = conn.get_alerts_speed()
@@ -174,26 +174,93 @@ class VCenterConnection:
             self.si = None
             self.content = None
 
-    def get_vms_speed(self):
+    def get_vms_speed(self, cached_hosts=None):
+        """Fetches detailed VM info for inventory."""
         if not self.content: return []
+        
+        def get_snaps(snap_tree):
+            res = []
+            for s in snap_tree:
+                res.append({
+                    "name": s.name,
+                    "description": s.description,
+                    "created": s.createTime.isoformat() if s.createTime else None
+                })
+                if s.childSnapshotList:
+                    res.extend(get_snaps(s.childSnapshotList))
+            return res
+
         try:
+            host_map = {}
+            if cached_hosts:
+                for h in cached_hosts:
+                    if 'mo_id' in h: host_map[h['mo_id']] = h['name']
+
             view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.VirtualMachine], True)
+            
+            paths = [
+                "name", "runtime.powerState", "runtime.host", 
+                "guest.ipAddress", "summary.config.numVirtualDisks", 
+                "guest.net", "snapshot",
+                "config.hardware.numCPU", "config.hardware.memoryMB",
+                "summary.storage.committed", "summary.storage.uncommitted",
+                "summary.config.annotation"
+            ]
+            
             spec = vim.PropertyFilterSpec(
-                propSet=[vim.PropertySpec(type=vim.VirtualMachine, pathSet=["name", "runtime.powerState", "layoutEx.snapshot"])],
+                propSet=[vim.PropertySpec(type=vim.VirtualMachine, pathSet=paths)],
                 objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
             )
             props = self.content.propertyCollector.RetrieveContents([spec])
             view.Destroy()
+            
             vms = []
             for obj in props:
-                d = {"vcenter_id": self.config.id, "snapshot_count": 0}
+                vm_id = obj.obj._moId
+                d = {
+                    "id": vm_id, 
+                    "vcenter_id": self.config.id, 
+                    "vcenter_name": self.config.name,
+                    "snapshot_count": 0,
+                    "snapshots": [],
+                    "networks": [],
+                    "ip": None,
+                    "disks": 0,
+                    "host": "Unknown",
+                    "vcpu": 0,
+                    "vram_mb": 0,
+                    "storage_committed": 0,
+                    "storage_uncommitted": 0,
+                    "notes": ""
+                }
+                
                 for p in obj.propSet:
                     if p.name == "name": d["name"] = p.val
                     elif p.name == "runtime.powerState": d["power_state"] = p.val
-                    elif p.name == "layoutEx.snapshot" and p.val: d["snapshot_count"] = len(p.val)
+                    elif p.name == "guest.ipAddress": d["ip"] = p.val
+                    elif p.name == "summary.config.numVirtualDisks": d["disks"] = p.val
+                    elif p.name == "runtime.host":
+                        host_mor = p.val
+                        d["host"] = host_map.get(host_mor._moId, f"Host:{host_mor._moId}")
+                    elif p.name == "config.hardware.numCPU": d["vcpu"] = p.val
+                    elif p.name == "config.hardware.memoryMB": d["vram_mb"] = p.val
+                    elif p.name == "summary.storage.committed": d["storage_committed"] = p.val
+                    elif p.name == "summary.storage.uncommitted": d["storage_uncommitted"] = p.val
+                    elif p.name == "summary.config.annotation": d["notes"] = p.val
+                    elif p.name == "guest.net" and p.val:
+                        pgs = set()
+                        for nic in p.val:
+                            if nic.network: pgs.add(nic.network)
+                        d["networks"] = list(pgs)
+                    elif p.name == "snapshot" and p.val:
+                        d["snapshots"] = get_snaps(p.val.rootSnapshotList)
+                        d["snapshot_count"] = len(d["snapshots"])
+                
                 vms.append(d)
             return vms
-        except: return []
+        except Exception as e:
+            logger.error(f"Error fetching detailed VMs: {e}")
+            return []
 
     def get_hosts_speed(self):
         if not self.content: return []
@@ -205,7 +272,16 @@ class VCenterConnection:
             )
             props = self.content.propertyCollector.RetrieveContents([spec])
             view.Destroy()
-            return [{"name": next(p.val for p in obj.propSet if p.name == "name"), "vcenter_id": self.config.id} for obj in props]
+            
+            hosts = []
+            for obj in props:
+                name = next((p.val for p in obj.propSet if p.name == "name"), "Unknown")
+                hosts.append({
+                    "name": name, 
+                    "vcenter_id": self.config.id,
+                    "mo_id": obj.obj._moId
+                })
+            return hosts
         except: return []
 
     def get_recent_events(self, minutes=30):
@@ -227,44 +303,32 @@ class VCenterConnection:
         except: return []
 
     def get_recent_tasks(self, minutes=30):
-        """Fetches live tasks from this vCenter."""
         if not self.content: return []
         try:
             time_limit = datetime.now() - timedelta(minutes=minutes)
             time_filter = vim.TaskFilterSpec.ByTime(beginTime=time_limit, timeType="startedTime")
             filter_spec = vim.TaskFilterSpec(time=time_filter)
-            
             collector = self.content.taskManager.CreateCollectorForTasks(filter_spec)
             try:
                 tasks_list = collector.ReadNextTasks(999)
             finally:
-                # In vSphere API, HistoryCollectors use DestroyCollector(), not Destroy()
-                if hasattr(collector, 'DestroyCollector'):
-                    collector.DestroyCollector()
-                elif hasattr(collector, 'Destroy'):
-                    collector.Destroy()
+                if hasattr(collector, 'DestroyCollector'): collector.DestroyCollector()
+                elif hasattr(collector, 'Destroy'): collector.Destroy()
             
             result = []
             for t in tasks_list:
                 status = t.state
                 progress = t.progress if t.progress is not None else (100 if status == 'success' else 0)
-                
                 result.append({
-                    "vcenter_id": self.config.id,
-                    "vcenter_name": self.config.name,
-                    "name": t.descriptionId or "Task",
-                    "entity_name": t.entityName or "Unknown",
+                    "vcenter_id": self.config.id, "vcenter_name": self.config.name,
+                    "name": t.descriptionId or "Task", "entity_name": t.entityName or "Unknown",
                     "user": t.reason.userName if hasattr(t.reason, 'userName') else "System",
                     "start_time": t.startTime.isoformat() if t.startTime else None,
                     "completion_time": t.completeTime.isoformat() if t.completeTime else None,
-                    "status": status,
-                    "progress": progress,
-                    "error": t.error.localizedMessage if t.error else None
+                    "status": status, "progress": progress, "error": t.error.localizedMessage if t.error else None
                 })
             return result
-        except Exception as ex:
-            logger.error(f"Error fetching tasks from {self.config.name}: {ex}")
-            return []
+        except: return []
 
     def get_alerts_speed(self):
         if not self.content: return []

@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import auth, dashboard, vcenters
+from app.api import auth, dashboard, vcenters, inventory
 from app.core.session import is_authenticated
 from app.core.config import settings
 
@@ -67,6 +67,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(vcenters.router)
+app.include_router(inventory.router)
 
 def get_vcenter_status(request: Request):
     """Helper to get vCenter connection status for templates."""
@@ -145,6 +146,30 @@ async def reports(request: Request):
         "username": request.session.get("username"),
         "active_page": "reports",
         "vcenter_status": get_vcenter_status(request)
+    })
+
+@app.get("/hosts")
+async def hosts_page(request: Request):
+    if not is_authenticated(request): return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse("hosts.html", {
+        "request": request, "username": request.session.get("username"),
+        "active_page": "hosts", "vcenter_status": get_vcenter_status(request)
+    })
+
+@app.get("/datastores")
+async def datastores_page(request: Request):
+    if not is_authenticated(request): return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse("datastores.html", {
+        "request": request, "username": request.session.get("username"),
+        "active_page": "datastores", "vcenter_status": get_vcenter_status(request)
+    })
+
+@app.get("/performance")
+async def performance_page(request: Request):
+    if not is_authenticated(request): return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse("performance.html", {
+        "request": request, "username": request.session.get("username"),
+        "active_page": "performance", "vcenter_status": get_vcenter_status(request)
     })
 
 if __name__ == "__main__":
