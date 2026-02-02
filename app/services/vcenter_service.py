@@ -3,7 +3,7 @@ import logging
 import asyncio
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
 from app.core.config import VCenterConfig, settings
@@ -128,6 +128,18 @@ class VCenterManager:
         if not self.cache.is_unlocked(): return {"total_vms": "Locked", "has_data": False}
         return self.cache.get_cached_stats()
 
+    def get_all_recent_events(self, minutes=30):
+        """Fetches live events from all connected vCenters (no cache)."""
+        all_events = []
+        for vc_id, conn in self.connections.items():
+            if conn.is_alive():
+                events = conn.get_recent_events(minutes)
+                all_events.extend(events)
+        
+        # Sort by time descending
+        all_events.sort(key=lambda x: x['time'], reverse=True)
+        return all_events
+
 class VCenterConnection:
     def __init__(self, config: VCenterConfig):
         self.config = config
@@ -189,6 +201,38 @@ class VCenterConnection:
             view.Destroy()
             return [{"name": next(p.val for p in obj.propSet if p.name == "name"), "vcenter_id": self.config.id} for obj in props]
         except: return []
+
+    def get_recent_events(self, minutes=30):
+        """Fetches live events from this vCenter."""
+        if not self.content: return []
+        try:
+            event_manager = self.content.eventManager
+            filter_spec = vim.event.EventFilterSpec()
+            time_limit = datetime.now() - timedelta(minutes=minutes)
+            filter_spec.time = vim.event.EventFilterSpec.ByTime(beginTime=time_limit)
+            
+            events = event_manager.QueryEvents(filter_spec)
+            
+            result = []
+            for e in events:
+                # Map event types to human readable
+                severity = "info"
+                if isinstance(e, (vim.event.AlarmStatusChangedEvent, vim.event.AlarmActionTriggeredEvent)):
+                    severity = "warning"
+                
+                result.append({
+                    "vcenter_id": self.config.id,
+                    "vcenter_name": self.config.name,
+                    "type": e.__class__.__name__.replace("Event", ""),
+                    "message": e.fullFormattedMessage,
+                    "user": e.userName or "System",
+                    "time": e.createdTime.isoformat(),
+                    "severity": severity
+                })
+            return result
+        except Exception as ex:
+            logger.error(f"Error fetching events from {self.config.name}: {ex}")
+            return []
 
     def get_alerts_speed(self):
         """Fetches triggered alarms for VMs, Hosts, Datacenters, Clusters and Folders."""

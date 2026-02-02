@@ -1,0 +1,37 @@
+<table>
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Type</th>
+            <th>vCenter</th>
+            <th>User</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if events %}
+        {% for event in events %}
+        <tr>
+            <td style="color: var(--text-dim); font-size: 0.75rem; white-space: nowrap;">
+                {{ event.time.split('T')[1].split('.')[0] }}
+            </td>
+            <td>
+                <span
+                    style="font-size: 0.7rem; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; color: var(--text-dim);">
+                    {{ event.type }}
+                </span>
+            </td>
+            <td style="font-size: 0.8rem;">{{ event.vcenter_name }}</td>
+            <td style="font-size: 0.8rem; color: var(--primary);">{{ event.user }}</td>
+            <td style="font-size: 0.875rem;">{{ event.message }}</td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+            <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 3rem;">
+                No events recorded in the last 30 minutes.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>

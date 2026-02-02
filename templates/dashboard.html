@@ -25,7 +25,7 @@
 
 <!-- Alerts Table -->
 <section class="table-container" style="margin-top: 2rem;" id="alerts-table-section">
-    <div onclick="toggleAlerts()"
+    <div onclick="toggleSection('alerts-table-content', 'alerts-toggle-icon')"
         style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
         <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
             <i data-lucide="bell" size="18"></i> Triggered Infrastructure Alarms
@@ -38,7 +38,7 @@
             <i data-lucide="chevron-down"></i>
         </div>
     </div>
-    <div id="alerts-table-content" style="display: none; overflow: hidden; transition: max-height 0.3s ease-out;">
+    <div id="alerts-table-content" style="display: none;">
         <table>
             <thead>
                 <tr>
@@ -83,19 +83,69 @@
         </table>
     </div>
 </section>
+
+<!-- Recent Events Table -->
+<section class="table-container" style="margin-top: 1.5rem;" id="events-table-section">
+    <div onclick="toggleEvents()"
+        style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+        <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="activity" size="18"></i> Recent Events (Last 30m)
+        </h2>
+        <div id="events-toggle-icon" style="transition: transform 0.3s ease;">
+            <i data-lucide="chevron-down"></i>
+        </div>
+    </div>
+    <div id="events-table-content" style="display: none;" hx-get="/api/dashboard/events-table"
+        hx-trigger="load-events from:body" hx-swap="innerHTML">
+        <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
+            <div class="spinner-small" style="margin-bottom: 1rem;"></div>
+            Fetching live events from vCenters...
+        </div>
+    </div>
+</section>
+
+<style>
+    .spinner-small {
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--border);
+        border-top: 2px solid var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+</style>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
     lucide.createIcons();
 
-    function toggleAlerts() {
-        const content = document.getElementById('alerts-table-content');
-        const icon = document.getElementById('alerts-toggle-icon');
+    function toggleSection(contentId, iconId) {
+        const content = document.getElementById(contentId);
+        const icon = document.getElementById(iconId);
 
         if (content.style.display === 'none') {
             content.style.display = 'block';
             icon.style.transform = 'rotate(180deg)';
+        } else {
+            content.style.display = 'none';
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    function toggleEvents() {
+        const content = document.getElementById('events-table-content');
+        const icon = document.getElementById('events-toggle-icon');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            icon.style.transform = 'rotate(180deg)';
+
+            // Trigger HTMX load only if content is empty or contains the loader
+            if (content.innerHTML.includes('spinner-small')) {
+                htmx.trigger("body", "load-events");
+            }
         } else {
             content.style.display = 'none';
             icon.style.transform = 'rotate(0deg)';

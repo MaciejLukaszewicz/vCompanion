@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, Response
 from fastapi.responses import JSONResponse
 from app.core.session import require_auth
 from app.services.vcenter_service import VCenterManager
@@ -43,3 +43,19 @@ async def get_alerts_api(request: Request):
         stats_data = request.app.state.vcenter_manager.get_stats()
         return JSONResponse(stats_data.get("raw_alerts", []))
     return JSONResponse([])
+
+@router.get("/events-table")
+async def get_events_table(request: Request):
+    """Returns partial HTML for the events table."""
+    require_auth(request)
+    
+    events = []
+    if hasattr(request.app.state, 'vcenter_manager'):
+        vcenter_manager = request.app.state.vcenter_manager
+        events = vcenter_manager.get_all_recent_events(minutes=30)
+    
+    from main import templates
+    return templates.TemplateResponse("partials/events_table.html", {
+        "request": request,
+        "events": events
+    })
