@@ -144,6 +144,20 @@
         </div>
     </div>
 
+    <!-- Connection Lost Overlay -->
+    <div id="connection-lost-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 10000; flex-direction: column; align-items: center; justify-content: center; gap: 2rem;">
+        <div class="spinner" style="width: 80px; height: 80px;"></div>
+        <div style="text-align: center;">
+            <h2 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--text-main);">Connection Lost</h2>
+            <p style="color: var(--text-dim); font-size: 1.125rem;">The vCompanion server is unreachable. Attempting to
+                reconnect...</p>
+        </div>
+        <button onclick="window.location.reload()" class="btn-primary" style="margin-top: 1rem;">
+            <i data-lucide="refresh-cw"></i> Retry Now
+        </button>
+    </div>
+
     <script>
         // Modal functions
         function openLoginModal(preselectedVcId = null) {
@@ -273,6 +287,65 @@
 
         // Refresh icons after HTMX content updates
         document.body.addEventListener('htmx:afterOnLoad', refreshIcons);
+
+        // Server Health Monitoring
+        let isDisconnected = false;
+        let reconnectInterval = null;
+
+        document.body.addEventListener('htmx:sendError', function (evt) {
+            handleDisconnect();
+        });
+
+        document.body.addEventListener('htmx:responseError', function (evt) {
+            if (evt.detail.xhr.status === 0 || evt.detail.xhr.status >= 500) {
+                // Status 0 means server is down/network error
+                handleDisconnect();
+            }
+        });
+
+        async function checkServerHealth() {
+            try {
+                const response = await fetch('/api/vcenters/status-bar');
+                if (response.ok || response.status === 401) { // 401 is fine, means server is up but session expired
+                    handleReconnect();
+                }
+            } catch (e) {
+                // Still down
+            }
+        }
+
+        function handleDisconnect() {
+            if (isDisconnected) return;
+            isDisconnected = true;
+            document.getElementById('connection-lost-overlay').style.display = 'flex';
+
+            // Start polling for server to come back
+            if (!reconnectInterval) {
+                reconnectInterval = setInterval(checkServerHealth, 3000);
+            }
+
+            if (window.showNotification) {
+                showNotification("Server connection lost!", "error");
+            }
+        }
+
+        function handleReconnect() {
+            if (!isDisconnected) return;
+            isDisconnected = false;
+            document.getElementById('connection-lost-overlay').style.display = 'none';
+
+            if (reconnectInterval) {
+                clearInterval(reconnectInterval);
+                reconnectInterval = null;
+            }
+
+            if (window.showNotification) {
+                showNotification("Connection restored.", "success");
+            }
+
+            // Trigger a full refresh of UI components
+            htmx.trigger("body", "vcenter-refreshed");
+        }
 
         // Toast Notification System
         function showNotification(message, type = 'info') {
