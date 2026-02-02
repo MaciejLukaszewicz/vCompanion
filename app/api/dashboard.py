@@ -49,13 +49,13 @@ async def get_events_table(request: Request):
     require_auth(request)
     events = []
     if hasattr(request.app.state, 'vcenter_manager'):
-        events = request.app.state.vcenter_manager.get_all_recent_events(minutes=30)
+        # Reduced to 5 minutes as requested
+        events = request.app.state.vcenter_manager.get_all_recent_events(minutes=5)
     from main import templates
     return templates.TemplateResponse("partials/events_table.html", {"request": request, "events": events})
 
 @router.get("/tasks-table")
 async def get_tasks_table(request: Request):
-    """Returns partial HTML for the tasks table."""
     require_auth(request)
     tasks = []
     if hasattr(request.app.state, 'vcenter_manager'):

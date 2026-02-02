@@ -1,7 +1,8 @@
 <div class="stat-card">
     <h3>Total Virtual Machines</h3>
     <div class="value">{{ stats.total_vms | default('--') }}</div>
-    <div class="delta up"><i data-lucide="trending-up"></i> {{ stats.vms_delta | default('Loading...') }}</div>
+    <div style="font-size: 0.875rem; color: var(--text-dim); margin-top: 0.5rem;">{{ stats.vms_delta |
+        default('Loading...') }}</div>
 
     {% if per_vcenter_stats %}
     <div class="stat-breakdown">
@@ -18,8 +19,8 @@
 <div class="stat-card">
     <h3>Active Snapshots</h3>
     <div class="value">{{ stats.snapshots | default('--') }}</div>
-    <div class="delta down"><i data-lucide="trending-down"></i> {{ stats.snapshots_delta | default('Loading...') }}
-    </div>
+    <div style="font-size: 0.875rem; color: var(--text-dim); margin-top: 0.5rem;">{{ stats.snapshots_delta |
+        default('Loading...') }}</div>
 
     {% if per_vcenter_stats %}
     <div class="stat-breakdown">
@@ -36,7 +37,8 @@
 <div class="stat-card">
     <h3>Host Systems</h3>
     <div class="value">{{ stats.clusters | default('--') }}</div>
-    <div class="delta" style="color: var(--text-dim)">{{ stats.clusters_status | default('Loading...') }}</div>
+    <div style="font-size: 0.875rem; color: var(--text-dim); margin-top: 0.5rem;">{{ stats.clusters_status |
+        default('Loading...') }}</div>
 
     {% if per_vcenter_stats %}
     <div class="stat-breakdown">
@@ -91,4 +93,28 @@
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
+
+    // Alert Change Notification Logic
+    (function () {
+        const currentCrit = parseInt('{{ stats.critical_alerts | default(0) }}');
+        const currentWarn = parseInt('{{ stats.warning_alerts | default(0) }}');
+
+        const lastCrit = parseInt(localStorage.getItem('vcompanion_last_crit') || '-1');
+        const lastWarn = parseInt(localStorage.getItem('vcompanion_last_warn') || '-1');
+
+        if (lastCrit !== -1 && (currentCrit !== lastCrit || currentWarn !== lastWarn)) {
+            // Show notification if bridged
+            if (window.showNotification) {
+                let msg = "";
+                if (currentCrit > lastCrit) msg = `New CRITICAL alerts detected! (${currentCrit})`;
+                else if (currentCrit < lastCrit) msg = `Critical alerts resolved. (${currentCrit} remaining)`;
+                else msg = `Alert status updated.`;
+
+                window.showNotification(msg, currentCrit > lastCrit ? 'error' : 'info');
+            }
+        }
+
+        localStorage.setItem('vcompanion_last_crit', currentCrit);
+        localStorage.setItem('vcompanion_last_warn', currentWarn);
+    })();
 </script>

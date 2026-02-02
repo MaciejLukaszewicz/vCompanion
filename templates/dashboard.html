@@ -10,11 +10,6 @@
             Summary across {{ vcenter_count }} connected vCenter environment{{ 's' if vcenter_count != 1 else '' }}
         </p>
     </div>
-    <div class="search-bar">
-        <i data-lucide="search" size="18" style="color: var(--text-dim);"></i>
-        <input type="text" placeholder="Search VMs, IPs, Hosts..." hx-get="/api/search"
-            hx-trigger="keyup changed delay:500ms" hx-target="#search-results">
-    </div>
 </header>
 
 <!-- Stats Grid -->
@@ -109,7 +104,7 @@
     <div onclick="toggleEvents()"
         style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
         <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-            <i data-lucide="activity" size="18"></i> Recent Events (Last 30m)
+            <i data-lucide="activity" size="18"></i> Recent Events (Last 5m)
         </h2>
         <div id="events-toggle-icon" style="transition: transform 0.3s ease;">
             <i data-lucide="chevron-down"></i>
