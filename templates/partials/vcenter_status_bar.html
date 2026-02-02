@@ -1,7 +1,7 @@
 {% for vc in vcenter_status %}
 <div class="vcenter-pill {{ 'connected' if vc.connected else 'disconnected' }} refresh-{{ vc.refresh_status | lower }}"
     data-vcenter-id="{{ vc.id }}" {% if vc.refresh_status !='REFRESHING' %} hx-post="/api/vcenters/refresh/{{ vc.id }}"
-    hx-trigger="click" hx-swap="none" title="Click to refresh manually" style="cursor: pointer;" {% endif %}>
+    hx-trigger="click" hx-swap="none" title="Click to refresh this vCenter" style="cursor: pointer;" {% endif %}>
 
     <span class="status-indicator"></span>
 

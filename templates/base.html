@@ -72,10 +72,13 @@
                 {% include "partials/vcenter_status_bar.html" %}
             </div>
 
-            <button class="btn-login-additional" onclick="openLoginModal()">
-                <i data-lucide="plus"></i>
-                Connect Additional
-            </button>
+            <div class="vcenter-actions">
+                <button class="btn-refresh-all" hx-post="/api/vcenters/refresh-all" hx-swap="none"
+                    title="Refresh all connected vCenters">
+                    <i data-lucide="refresh-cw"></i>
+                    Refresh All
+                </button>
+            </div>
         </div>
         {% endif %}
 

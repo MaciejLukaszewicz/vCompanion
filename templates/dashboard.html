@@ -18,7 +18,8 @@
 </header>
 
 <!-- Stats Grid -->
-<section class="stats-grid" hx-get="/api/vcenters/stats-cards" hx-trigger="every 10s" hx-swap="innerHTML">
+<section class="stats-grid" hx-get="/api/vcenters/stats-cards" hx-trigger="vcenter-refreshed from:body, every 60s"
+    hx-swap="innerHTML">
     {% include "partials/stats_grid.html" %}
 </section>
 

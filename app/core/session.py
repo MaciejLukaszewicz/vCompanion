@@ -28,12 +28,14 @@ def is_authenticated(request: Request) -> bool:
         except:
             return False
     
-    # Additionally check if cache is unlocked (server-side security)
-    if hasattr(request.app.state, 'vcenter_manager'):
-        if not request.app.state.vcenter_manager.cache.is_unlocked():
-            # If server restarted, session might look alive but key is gone
-            logger.warning("Session looks alive but cache is locked (server restart?).")
-            return False
+    # In Zero-Password-Storage, session is only valid if server has the manager and cache is unlocked
+    if not hasattr(request.app.state, 'vcenter_manager'):
+        return False
+        
+    if not request.app.state.vcenter_manager.cache.is_unlocked():
+        # If server restarted, session might look alive but key is gone
+        logger.warning("Session looks alive but cache is locked (server restart?).")
+        return False
             
     return True
 

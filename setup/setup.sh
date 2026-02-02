@@ -31,7 +31,7 @@ pip install -r ../requirements.txt
 
 if [ $? -eq 0 ]; then
     echo "[SUCCESS] Setup completed successfully."
-    echo "You can now run the application using ./run.sh"
+    echo "You can now run the application using ./run.sh from the root directory"
 else
     echo "[ERROR] Failed to install requirements."
     exit 1

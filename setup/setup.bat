@@ -39,5 +39,5 @@ if %errorlevel% neq 0 (
 )
 
 echo [SUCCESS] Setup completed successfully.
-echo You can now run the application using run.bat.
+echo You can now run the application using run.bat from the root directory.
 pause

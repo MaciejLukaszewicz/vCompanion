@@ -16,10 +16,23 @@ async def get_status_bar(request: Request):
     from main import templates, get_vcenter_status
     vcenter_status = get_vcenter_status(request)
     
-    return templates.TemplateResponse("partials/vcenter_status_bar.html", {
+    response = templates.TemplateResponse("partials/vcenter_status_bar.html", {
         "request": request,
         "vcenter_status": vcenter_status
     })
+    
+    # Trigger stats refresh on dashboard if any vcenter recently finished refreshing
+    any_recently_finished = any(
+        vc.get('refresh_status') == 'READY' and 
+        vc.get('seconds_since') is not None and 
+        vc.get('seconds_since') < 10 
+        for vc in vcenter_status
+    )
+    
+    if any_recently_finished:
+        response.headers["HX-Trigger"] = "vcenter-refreshed"
+        
+    return response
 
 @router.post("/refresh/{vc_id}")
 async def refresh_vcenter(vc_id: str, request: Request):
@@ -30,6 +43,19 @@ async def refresh_vcenter(vc_id: str, request: Request):
     if hasattr(request.app.state, 'vcenter_manager'):
         vcenter_manager = request.app.state.vcenter_manager
         vcenter_manager.trigger_refresh(vc_id)
+        return Response(status_code=200)
+    
+    return Response(status_code=400)
+
+@router.post("/refresh-all")
+async def refresh_all_vcenters(request: Request):
+    """Triggers refresh for all connected vCenters."""
+    if not is_authenticated(request):
+        return Response(status_code=401)
+        
+    if hasattr(request.app.state, 'vcenter_manager'):
+        vcenter_manager = request.app.state.vcenter_manager
+        vcenter_manager.refresh_all()
         return Response(status_code=200)
     
     return Response(status_code=400)

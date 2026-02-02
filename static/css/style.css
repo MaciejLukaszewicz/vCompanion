@@ -633,8 +633,19 @@ tr:last-child td {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 1rem;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1.25rem;
     margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+
+.vcenter-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
 }
 
 .vcenter-status-container {
@@ -699,6 +710,7 @@ tr:last-child td {
 
 .refresh-ready {
     background: #000 !important;
+    border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
 .refresh-refreshing {
@@ -741,6 +753,26 @@ tr:last-child td {
     align-items: center;
     gap: 0.5rem;
     transition: all 0.2s ease;
+}
+
+.btn-refresh-all {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-refresh-all:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--text-dim);
 }
 
 .btn-login-additional:hover {

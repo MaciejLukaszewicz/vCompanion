@@ -16,11 +16,12 @@ class VCenterManager:
     def __init__(self, configs: list[VCenterConfig]):
         self.connections = {cfg.id: VCenterConnection(cfg) for cfg in configs}
         self.cache = cache_service
-        self.refresh_interval = settings.app_settings.refresh_interval_seconds
+        self.global_refresh_interval = settings.app_settings.refresh_interval_seconds
         self._stop_event = threading.Event()
         self._worker_thread = None
         
-        # NOTE: Background worker starts ONLY after cache is unlocked (in connect_all)
+        # Track last refresh in memory for the worker loop
+        self._last_refresh_trigger = {cfg.id: 0 for cfg in configs}
 
     def start_worker(self):
         """Starts the background refresh worker thread."""
@@ -44,23 +45,26 @@ class VCenterManager:
         logger.info("Background refresh worker stopped.")
 
     def _worker_loop(self):
-        """Main loop for background refreshing."""
+        """Main loop for background refreshing with per-vCenter intervals."""
         while not self._stop_event.is_set():
-            # If cache gets locked somehow, stop working
             if not self.cache.is_unlocked():
-                logger.info("Cache locked, stopping background worker.")
                 break
 
-            # Trigger refresh for all connected vCenters
+            now = time.time()
             for vc_id, conn in self.connections.items():
-                if conn.is_alive():
-                    self.trigger_refresh(vc_id)
+                # Get interval: specific or global
+                interval = conn.config.refresh_interval or self.global_refresh_interval
+                
+                if now - self._last_refresh_trigger[vc_id] >= interval:
+                    if conn.is_alive():
+                        self.trigger_refresh(vc_id)
+                        self._last_refresh_trigger[vc_id] = now
             
-            # Sleep for the interval
-            for _ in range(self.refresh_interval):
+            # Precise sleep for responsiveness
+            for _ in range(10): # Check every 100ms
                 if self._stop_event.is_set():
                     break
-                time.sleep(1)
+                time.sleep(0.1)
 
     def trigger_refresh(self, vc_id):
         """Manually trigger a refresh for a specific vCenter."""
@@ -71,7 +75,15 @@ class VCenterManager:
             return
             
         conn = self.connections[vc_id]
+        # Update last trigger time so worker doesn't double refresh
+        self._last_refresh_trigger[vc_id] = time.time()
         threading.Thread(target=self._refresh_task, args=(vc_id, conn), daemon=True).start()
+
+    def refresh_all(self):
+        """Trigger refresh for all connected vCenters."""
+        for vc_id, conn in self.connections.items():
+            if conn.is_alive():
+                self.trigger_refresh(vc_id)
 
     def _refresh_task(self, vc_id, conn):
         """The actual refresh task that calls vCenter and updates cache."""
@@ -98,14 +110,10 @@ class VCenterManager:
             self.cache.update_vcenter_status(vc_id, conn.config.name, 'ERROR', str(e))
 
     def connect_all(self, user, password, selected_vcenter_ids=None):
-        """Connect to selected vCenters, unlock cache and start worker."""
-        # 1. First, try to unlock the cache with the provided password
         if not self.cache.is_unlocked():
             if not self.cache.derive_key(password):
-                logger.error("Failed to unlock cache with provided password.")
                 return {vid: False for vid in (selected_vcenter_ids or self.connections.keys())}
 
-        # 2. Start background worker if not already running
         self.start_worker()
 
         results = {}
@@ -122,19 +130,18 @@ class VCenterManager:
         return results
 
     def disconnect_all(self):
-        """Disconnect all vCenters, stop worker and lock cache."""
         self.stop_worker()
-        self.cache.lock() # This clears the key and data from RAM
+        self.cache.lock()
         for conn in self.connections.values():
             conn.disconnect()
 
     def get_connection_status(self):
-        """Get connection and refresh status for all vCenters."""
         cache_statuses = {s['id']: s for s in self.cache.get_vcenter_status()}
         status = []
         
         for vc_id, conn in self.connections.items():
             cache_status = cache_statuses.get(vc_id, {})
+            interval = conn.config.refresh_interval or self.global_refresh_interval
             
             seconds_since = None
             if cache_status.get('last_refresh'):
@@ -144,7 +151,7 @@ class VCenterManager:
                 except:
                     pass
             
-            seconds_until = max(0, self.refresh_interval - (seconds_since or 0))
+            seconds_until = max(0, interval - (seconds_since or 0))
 
             status.append({
                 "id": vc_id,
@@ -161,7 +168,6 @@ class VCenterManager:
         return status
 
     def get_stats(self):
-        """Get statistics from cache if unlocked."""
         if not self.cache.is_unlocked():
             return {
                 "total_vms": "Locked",
@@ -175,7 +181,6 @@ class VCenterManager:
             }
 
         stats = self.cache.get_cached_stats()
-        # Update connection status in per_vcenter from real-time info
         for vc_id, conn in self.connections.items():
             if vc_id in stats['per_vcenter']:
                 stats['per_vcenter'][vc_id]['connected'] = conn.is_alive()
@@ -212,10 +217,8 @@ class VCenterConnection:
                 sslContext=context
             )
             self.content = self.service_instance.RetrieveContent()
-            logger.info(f"Successfully connected to vCenter: {self.config.name}")
             return True
         except Exception as e:
-            logger.error(f"Failed to connect to vCenter {self.config.id}: {str(e)}")
             return False
 
     def disconnect(self):
@@ -230,7 +233,6 @@ class VCenterConnection:
             container = self.content.rootFolder
             view_type = [vim.VirtualMachine]
             container_view = self.content.viewManager.CreateContainerView(container, view_type, True)
-            
             vms = []
             for vm in container_view.view:
                 try:
@@ -238,7 +240,7 @@ class VCenterConnection:
                     if vm.snapshot:
                         snapshot_count = len(vm.snapshot.rootSnapshotList)
                     guest_os = vm.config.guestFullName if vm.config else "Unknown"
-                    vm_info = {
+                    vms.append({
                         "name": vm.name,
                         "power_state": vm.runtime.powerState,
                         "guest_os": guest_os,
@@ -248,8 +250,7 @@ class VCenterConnection:
                         "ip_address": vm.guest.ipAddress if vm.guest else None,
                         "vcenter_id": self.config.id,
                         "vcenter_name": self.config.name
-                    }
-                    vms.append(vm_info)
+                    })
                 except: continue
             container_view.Destroy()
             return vms
