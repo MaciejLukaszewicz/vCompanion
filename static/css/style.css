@@ -269,7 +269,7 @@ aside+main header {
 /* Dashboard Grid */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(5, 1fr);
     gap: 1.5rem;
     margin-bottom: 2rem;
 }
@@ -281,6 +281,10 @@ aside+main header {
     padding: 1.5rem;
     border-radius: 1rem;
     transition: transform 0.2s ease;
+}
+
+.stat-card.alert-card {
+    grid-column: span 2;
 }
 
 .stat-card:hover {
@@ -322,7 +326,29 @@ aside+main header {
     border-top: 1px solid var(--border);
     display: flex;
     flex-direction: column;
+    gap: 0.4rem;
+}
+
+.alert-severity-list {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.alert-severity-item {
+    display: flex;
+    align-items: center;
     gap: 0.35rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.severity-crit {
+    color: var(--danger);
+}
+
+.severity-warn {
+    color: var(--warning);
 }
 
 .breakdown-item {

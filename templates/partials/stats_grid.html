@@ -34,7 +34,7 @@
 </div>
 
 <div class="stat-card">
-    <h3>Host Clusters</h3>
+    <h3>Host Systems</h3>
     <div class="value">{{ stats.clusters | default('--') }}</div>
     <div class="delta" style="color: var(--text-dim)">{{ stats.clusters_status | default('Loading...') }}</div>
 
@@ -50,17 +50,37 @@
     {% endif %}
 </div>
 
-<div class="stat-card">
-    <h3>Critical Alerts</h3>
-    <div class="value" style="color: var(--danger)">{{ stats.alerts | default('--') }}</div>
-    <div class="delta up" style="color: var(--danger)">{{ stats.alerts_status | default('Loading...') }}</div>
+<div class="stat-card alert-card">
+    <h3>Infrastructure Alerts</h3>
+    <div class="alert-severity-list">
+        <div class="alert-severity-item severity-crit">
+            <i data-lucide="alert-circle" size="20"></i>
+            <span style="font-size: 1.75rem;">{{ stats.critical_alerts | default('0') }}</span>
+            <span style="font-size: 0.75rem; opacity: 0.8;">Critical</span>
+        </div>
+        <div class="alert-severity-item severity-warn" style="margin-left: 1.5rem;">
+            <i data-lucide="alert-triangle" size="20"></i>
+            <span style="font-size: 1.75rem;">{{ stats.warning_alerts | default('0') }}</span>
+            <span style="font-size: 0.75rem; opacity: 0.8;">Warning</span>
+        </div>
+    </div>
 
     {% if per_vcenter_stats %}
-    <div class="stat-breakdown">
+    <div class="stat-breakdown" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem;">
         {% for vc_id, vc in per_vcenter_stats.items() %}
-        <div class="breakdown-item">
-            <span>{{ vc.name }}</span>
-            <strong>0</strong>
+        <div class="breakdown-item"
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem;">
+            <span style="font-size: 0.75rem;">{{ vc.name }}</span>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 0.25rem;">
+                    <span class="severity-crit" style="font-weight: 700;">{{ vc.critical }}</span>
+                    <span style="font-size: 0.65rem; color: var(--text-dim);">CRIT</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.25rem;">
+                    <span class="severity-warn" style="font-weight: 700;">{{ vc.warning }}</span>
+                    <span style="font-size: 0.65rem; color: var(--text-dim);">WARN</span>
+                </div>
+            </div>
         </div>
         {% endfor %}
     </div>

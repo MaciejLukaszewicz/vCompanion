@@ -105,11 +105,11 @@ async def index(request: Request):
         'total_vms': f"{total_vms:,}" if isinstance(total_vms, int) else total_vms,
         'vms_delta': f"{stats_data.get('powered_on_vms', 0)} powered on" if has_data else "No data",
         'snapshots': str(stats_data.get('snapshot_count', 0)),
-        'snapshots_delta': "Active" if has_data else "No data",
+        'snapshots_delta': f"{stats_data.get('snapshot_count', 0)} active" if has_data else "No data",
         'clusters': str(stats_data.get('host_count', 0)),
         'clusters_status': f"{stats_data.get('host_count', 0)} host(s)" if has_data else "No data",
-        'alerts': '0',
-        'alerts_status': 'No critical alerts'
+        'critical_alerts': stats_data.get('critical_alerts', 0),
+        'warning_alerts': stats_data.get('warning_alerts', 0)
     }
     
     return templates.TemplateResponse("dashboard.html", {
@@ -120,7 +120,7 @@ async def index(request: Request):
         "vcenter_status": get_vcenter_status(request),
         "stats": stats,
         "per_vcenter_stats": stats_data.get('per_vcenter', {}),
-        "events": []
+        "alerts": stats_data.get('raw_alerts', [])
     })
 
 @app.get("/inventory")

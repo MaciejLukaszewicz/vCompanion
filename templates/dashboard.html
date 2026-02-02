@@ -18,57 +18,88 @@
 </header>
 
 <!-- Stats Grid -->
-<section class="stats-grid" hx-get="/api/vcenters/stats-cards" hx-trigger="vcenter-refreshed from:body, every 60s"
-    hx-swap="innerHTML">
+<section id="stats-container" class="stats-grid" hx-get="/api/vcenters/stats-cards"
+    hx-trigger="vcenter-refreshed from:body, every 60s" hx-swap="innerHTML">
     {% include "partials/stats_grid.html" %}
 </section>
 
-<!-- Recent Events Table -->
-<section class="table-container" style="margin-top: 2rem;">
-    <div
-        style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-        <h2 style="font-size: 1rem; font-weight: 600;">Recent Critical Events</h2>
-        <a href="#" style="color: var(--primary); font-size: 0.875rem; text-decoration: none;">View All</a>
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th>Event</th>
-                <th>vCenter</th>
-                <th>Target</th>
-                <th>Status</th>
-                <th>Time</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% if events %}
-            {% for event in events %}
-            <tr>
-                <td>{{ event.description }}</td>
-                <td>{{ event.vcenter }}</td>
-                <td>{{ event.target }}</td>
-                <td><span class="status-badge {{ event.severity }}">{{ event.severity | title }}</span></td>
-                <td>{{ event.time }}</td>
-            </tr>
-            {% endfor %}
-            {% else %}
-            <tr>
-                <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 4rem;">
-                    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-                        <i data-lucide="info" size="32"></i>
-                        <p>Waiting for infrastructure data updates...</p>
-                    </div>
-                </td>
-            </tr>
+<!-- Alerts Table -->
+<section class="table-container" style="margin-top: 2rem;" id="alerts-table-section">
+    <div onclick="toggleAlerts()"
+        style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+        <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="bell" size="18"></i> Triggered Infrastructure Alarms
+            {% if alerts|length > 0 %}
+            <span class="status-badge critical" style="padding: 2px 8px; font-size: 0.7rem; margin-left: 0.5rem;">{{
+                alerts|length }} ACTIVE</span>
             {% endif %}
-        </tbody>
-    </table>
+        </h2>
+        <div id="alerts-toggle-icon" style="transition: transform 0.3s ease;">
+            <i data-lucide="chevron-down"></i>
+        </div>
+    </div>
+    <div id="alerts-table-content" style="display: none; overflow: hidden; transition: max-height 0.3s ease-out;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Level</th>
+                    <th>Alarm Name</th>
+                    <th>Entity</th>
+                    <th>vCenter</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if alerts %}
+                {% for alert in alerts %}
+                <tr>
+                    <td><span class="status-badge {{ alert.severity }}">{{ alert.severity | upper }}</span></td>
+                    <td>
+                        <div
+                            style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-dim);">
+                            <span
+                                style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border);">{{
+                                alert.entity_type }}</span>
+                        </div>
+                    </td>
+                    <td style="font-weight: 500;">{{ alert.alarm_name }}</td>
+                    <td>{{ alert.entity_name }}</td>
+                    <td style="font-size: 0.8rem;">{{ alert.vcenter_name }}</td>
+                    <td style="color: var(--text-dim); font-size: 0.75rem;">{{ alert.time }}</td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 4rem;">
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                            <i data-lucide="check-circle" size="32" style="color: var(--success);"></i>
+                            <p>No active infrastructure alarms detected.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
 </section>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-    // Lucide icons refresh
     lucide.createIcons();
+
+    function toggleAlerts() {
+        const content = document.getElementById('alerts-table-content');
+        const icon = document.getElementById('alerts-toggle-icon');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            icon.style.transform = 'rotate(180deg)';
+        } else {
+            content.style.display = 'none';
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
 </script>
 {% endblock %}
