@@ -1,18 +1,20 @@
-<table>
+<table class="inventory-list-table">
     <thead>
         <tr>
             <th>Host Name</th>
+            <th>Management IP</th>
             <th>vCenter</th>
-            <th>MOID</th>
         </tr>
     </thead>
     <tbody>
         {% if hosts %}
         {% for host in hosts %}
-        <tr>
-            <td style="font-weight: 600;">{{ host.name }}</td>
-            <td style="color: var(--text-dim);">{{ host.vcenter_id }}</td>
-            <td style="font-family: monospace; font-size: 0.8rem;">{{ host.mo_id }}</td>
+        <tr class="host-row vc-color-{{ host.vc_color_index }}"
+            hx-get="/api/inventory/host-details/{{ host.vcenter_id }}/{{ host.mo_id }}" hx-target="#host-details-panel"
+            hx-trigger="click">
+            <td style="font-weight: 600; color: var(--text-main);">{{ host.name }}</td>
+            <td style="font-family: monospace; font-size: 0.85rem;">{{ host.ip }}</td>
+            <td style="font-size: 0.75rem; color: var(--text-dim);">{{ host.vcenter_name }}</td>
         </tr>
         {% endfor %}
         {% else %}

@@ -1,0 +1,140 @@
+<div style="padding: 2rem; animation: fadeIn 0.3s ease-out;">
+    <!-- Header with FQDN splitting -->
+    <div
+        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem;">
+        <div>
+            <h2
+                style="font-size: 2rem; font-weight: 800; margin-bottom: 0.1rem; color: var(--text-main); line-height: 1;">
+                {{ host.hostname }}</h2>
+            <div style="font-size: 0.875rem; color: var(--text-dim); margin-bottom: 0.75rem; font-family: monospace;">{{
+                host.domain }}</div>
+
+            <div style="display: flex; align-items: center; gap: 0.75rem; color: var(--text-dim); font-size: 0.875rem;">
+                <span class="status-badge {{ 'success' if host.power_state == 'poweredOn' else 'error' }}">{{
+                    host.power_state }}</span>
+                <span>•</span>
+                <span>{{ host.vcenter_name }}</span>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.25rem;">Management IP</div>
+            <div style="font-family: monospace; font-size: 1.25rem; font-weight: 600; color: var(--warning);">{{ host.ip
+                }}</div>
+        </div>
+    </div>
+
+    <!-- Software & Health -->
+    <div class="detail-section">
+        <h4><i data-lucide="info" size="14"></i> Software & Uptime</h4>
+        <div class="info-grid">
+            <div class="info-item">
+                <label>ESXi Version</label>
+                <span>{{ host.version }} (Build {{ host.build }})</span>
+            </div>
+            <div class="info-item">
+                <label>System Uptime</label>
+                <span style="color: var(--success); font-weight: 600;">{{ host.uptime_formatted }}</span>
+            </div>
+            <div class="info-item">
+                <label>Managed Object ID</label>
+                <span style="font-family: monospace; font-size: 0.8rem;">{{ host.mo_id }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Network Interfaces (VMkernel) -->
+    <div class="detail-section" style="margin-top: 2.5rem;">
+        <h4><i data-lucide="network" size="14"></i> Network Interfaces (VMkernel)</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+            {% for vnic in host.all_ips %}
+            <div
+                style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 1rem; border-radius: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <div style="font-weight: 800; font-size: 0.95rem; color: var(--primary);">{{ vnic.device }}
+                        </div>
+                        <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.1rem;">{{ vnic.portgroup }}
+                            (Label)</div>
+                    </div>
+                    <div style="font-family: monospace; font-size: 0.9rem; font-weight: 600; color: var(--text-main);">
+                        {{ vnic.ip }}</div>
+                </div>
+
+                {% if vnic.services %}
+                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.25rem;">
+                    {% for svc in vnic.services %}
+                    <span
+                        style="background: rgba(var(--primary-rgb), 0.15); color: var(--primary); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">
+                        {{ svc }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Physical NICs & Switches -->
+    <div class="detail-section" style="margin-top: 2.5rem;">
+        <h4><i data-lucide="cpu" size="14"></i> Physical Adapters (pNICs)</h4>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+            {% for pnic in host.pnics %}
+            <div
+                style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 0.5rem; display: flex; align-items: center; gap: 1rem; min-width: 180px;">
+                <i data-lucide="link" size="16" style="color: var(--text-dim);"></i>
+                <div>
+                    <div style="font-weight: 600; font-size: 0.85rem;">{{ pnic.device }}</div>
+                    <div style="font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase;">{{ pnic.switch
+                        }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Capacity & Usage -->
+    <div class="detail-section" style="margin-top: 2.5rem;">
+        <h4><i data-lucide="activity" size="14"></i> Resource Usage</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <div
+                style="background: rgba(var(--primary-rgb), 0.05); border: 1px solid var(--border); padding: 1.25rem; border-radius: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 600; font-size: 0.85rem;">CPU Core Capacity</span>
+                    <span style="font-size: 0.75rem; color: var(--text-dim);">{{ host.cpu_usage_mhz }} MHz Usage</span>
+                </div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: var(--primary);">{{ host.cpu_cores }} Cores
+                </div>
+            </div>
+
+            <div
+                style="background: rgba(255,165,0,0.05); border: 1px solid var(--border); padding: 1.25rem; border-radius: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 600; font-size: 0.85rem;">Memory (vRAM) Capacity</span>
+                    <span style="font-size: 0.75rem; color: var(--text-dim);">{{ host.memory_usage_formatted }}
+                        Used</span>
+                </div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: var(--warning);">{{ host.memory_total_formatted
+                    }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Datastores -->
+    <div class="detail-section" style="margin-top: 2.5rem;">
+        <h4><i data-lucide="database" size="14"></i> Connected Datastores</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
+            {% for ds_name in host.datastores %}
+            <div
+                style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 0.6rem 1rem; border-radius: 4px; font-size: 0.85rem; display: flex; align-items: center; gap: 0.75rem;">
+                <i data-lucide="hard-drive" size="14" style="color: var(--text-dim);"></i>
+                <span style="font-weight: 500;">{{ ds_name }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+</script>

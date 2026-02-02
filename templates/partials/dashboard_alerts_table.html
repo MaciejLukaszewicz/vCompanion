@@ -1,0 +1,54 @@
+<span id="alerts-count-badge" hx-swap-oob="innerHTML">
+    {% if alerts|length > 0 %}
+    <span class="status-badge critical" style="padding: 2px 8px; font-size: 0.7rem; margin-left: 0.5rem;">{{
+        alerts|length }} ACTIVE</span>
+    {% endif %}
+</span>
+
+<table>
+    <thead>
+        <tr>
+            <th>Severity</th>
+            <th>Level</th>
+            <th>Alarm Name</th>
+            <th>Entity</th>
+            <th>vCenter</th>
+            <th>Time</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if alerts %}
+        {% for alert in alerts %}
+        <tr>
+            <td><span class="status-badge {{ alert.severity }}">{{ alert.severity | upper }}</span></td>
+            <td>
+                <div
+                    style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-dim);">
+                    <span
+                        style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border);">
+                        {{ alert.entity_type }}
+                    </span>
+                </div>
+            </td>
+            <td style="font-weight: 500;">{{ alert.alarm_name }}</td>
+            <td>{{ alert.entity_name }}</td>
+            <td style="font-size: 0.8rem;">{{ alert.vcenter_name }}</td>
+            <td style="color: var(--text-dim); font-size: 0.75rem;">{{ alert.time }}</td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 4rem;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                    <i data-lucide="check-circle" size="32" style="color: var(--success);"></i>
+                    <p>No active infrastructure alarms detected.</p>
+                </div>
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<script>
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+</script>

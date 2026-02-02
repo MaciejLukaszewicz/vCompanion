@@ -62,3 +62,13 @@ async def get_tasks_table(request: Request):
         tasks = request.app.state.vcenter_manager.get_all_recent_tasks(minutes=30)
     from main import templates
     return templates.TemplateResponse("partials/tasks_table.html", {"request": request, "tasks": tasks})
+
+@router.get("/alerts-table")
+async def get_alerts_table(request: Request):
+    require_auth(request)
+    alerts = []
+    if hasattr(request.app.state, 'vcenter_manager'):
+        stats_data = request.app.state.vcenter_manager.get_stats()
+        alerts = stats_data.get("raw_alerts", [])
+    from main import templates
+    return templates.TemplateResponse("partials/dashboard_alerts_table.html", {"request": request, "alerts": alerts})

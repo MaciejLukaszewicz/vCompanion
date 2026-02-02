@@ -29,7 +29,7 @@ async def get_status_bar(request: Request):
     any_recently_finished = any(
         vc.get('refresh_status') == 'READY' and 
         vc.get('seconds_since') is not None and 
-        vc.get('seconds_since') < 10 
+        vc.get('seconds_since') < 30 
         for vc in vcenter_status
     )
     

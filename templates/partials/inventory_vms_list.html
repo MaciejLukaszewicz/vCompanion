@@ -10,17 +10,8 @@
     </thead>
     <tbody>
         {% if vms %}
-        {% set last_vc = {'id': ''} %}
-        {% set row_alt = {'state': False} %}
-
         {% for vm in vms %}
-        {# Change color/alternation when vCenter changes #}
-        {% if vm.vcenter_id != last_vc.id %}
-        {% if last_vc.update({'id': vm.vcenter_id}) %}{% endif %}
-        {% if row_alt.update({'state': not row_alt.state}) %}{% endif %}
-        {% endif %}
-
-        <tr class="vm-row {{ 'vcenter-alt' if row_alt.state else '' }}"
+        <tr class="vm-row vc-color-{{ vm.vc_color_index }}"
             hx-get="/api/inventory/vm-details/{{ vm.vcenter_id }}/{{ vm.id }}" hx-target="#vm-details-panel"
             hx-trigger="click">
             <td style="font-weight: 600; color: var(--text-main);">{{ vm.name }}</td>
@@ -51,13 +42,3 @@
         {% endif %}
     </tbody>
 </table>
-
-<style>
-    .vm-row.vcenter-alt {
-        background: rgba(255, 255, 255, 0.02);
-    }
-
-    .vm-row.vcenter-alt:hover {
-        background: rgba(var(--primary-rgb), 0.08) !important;
-    }
-</style>

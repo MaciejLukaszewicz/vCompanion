@@ -55,6 +55,14 @@ async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = Fals
     # Sort VMs by vCenter name first, then VM name
     vms.sort(key=lambda x: (x.get('vcenter_name', '').lower(), x.get('name', '').lower()))
     
+    # Assign color index based on stable hash of vcenter_id
+    def get_vc_color(vc_id):
+        import hashlib
+        return int(hashlib.md5(vc_id.encode()).hexdigest(), 16) % 5
+
+    for vm in vms:
+        vm['vc_color_index'] = get_vc_color(vm.get('vcenter_id', ''))
+
     from main import templates
     return templates.TemplateResponse("partials/inventory_vms_list.html", {
         "request": request,
@@ -98,10 +106,77 @@ async def get_hosts_partial(request: Request):
     """Returns the Hosts list partial."""
     require_auth(request)
     hosts = request.app.state.vcenter_manager.cache.get_all_hosts()
-    hosts.sort(key=lambda x: x.get('name', '').lower())
+    hosts.sort(key=lambda x: (x.get('vcenter_name', '').lower(), x.get('name', '').lower()))
     
+    # Assign color index based on stable hash of vcenter_id
+    def get_vc_color(vc_id):
+        import hashlib
+        return int(hashlib.md5(vc_id.encode()).hexdigest(), 16) % 5
+
+    for host in hosts:
+        host['vc_color_index'] = get_vc_color(host.get('vcenter_id', ''))
+
     from main import templates
     return templates.TemplateResponse("partials/inventory_hosts_list.html", {
         "request": request,
         "hosts": hosts
+    })
+
+@router.get("/host-details/{vcenter_id}/{mo_id}")
+async def get_host_details(request: Request, vcenter_id: str, mo_id: str):
+    """Returns the details panel for a specific ESXi Host."""
+    require_auth(request)
+    
+    hosts = request.app.state.vcenter_manager.cache.get_all_hosts()
+    host = next((h for h in hosts if h.get('vcenter_id') == vcenter_id and h.get('mo_id') == mo_id), None)
+    
+    if not host:
+        return HTMLResponse("<div style='padding: 2rem; color: var(--text-dim);'>Host not found in cache.</div>")
+    
+    # 1. Split FQDN
+    name = host.get('name', '')
+    parts = name.split('.')
+    host['hostname'] = parts[0]
+    host['domain'] = '.'.join(parts[1:]) if len(parts) > 1 else ""
+
+    # 2. Calculate Uptime
+    from datetime import datetime, timezone
+    boot_time_str = host.get('boot_time')
+    if boot_time_str:
+        try:
+            # boot_time_str is ISO format from isoformat()
+            boot_time = datetime.fromisoformat(boot_time_str)
+            # Ensure it has timezone info if now() has it, or strip both
+            if boot_time.tzinfo:
+                now = datetime.now(timezone.utc)
+            else:
+                now = datetime.now()
+                
+            uptime_delta = now - boot_time
+            days = uptime_delta.days
+            if days > 0:
+                hours = uptime_delta.seconds // 3600
+                host['uptime_formatted'] = f"{days}d {hours}h"
+            else:
+                hours = uptime_delta.seconds // 3600
+                minutes = (uptime_delta.seconds % 3600) // 60
+                host['uptime_formatted'] = f"{hours}h {minutes}m"
+            
+            if uptime_delta.total_seconds() < 0:
+                host['uptime_formatted'] = "Just booted"
+        except Exception as e:
+            logger.error(f"Uptime calc error: {e}")
+            host['uptime_formatted'] = "Error calculating"
+    else:
+        host['uptime_formatted'] = "N/A"
+
+    # 3. Memory & CPU Formatting
+    mem_total = host.get('memory_total_mb', 0)
+    host['memory_total_formatted'] = f"{mem_total / 1024:.2f} GB" if mem_total >= 1024 else f"{mem_total} MB"
+    host['memory_usage_formatted'] = f"{host.get('memory_usage_mb', 0) / 1024:.2f} GB"
+    
+    from main import templates
+    return templates.TemplateResponse("partials/inventory_host_details.html", {
+        "request": request,
+        "host": host
     })

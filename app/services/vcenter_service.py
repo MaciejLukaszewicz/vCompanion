@@ -266,8 +266,20 @@ class VCenterConnection:
         if not self.content: return []
         try:
             view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.HostSystem], True)
+            
+            paths = [
+                "name", "config.product.version", "config.product.build", 
+                "runtime.bootTime", "runtime.powerState",
+                "summary.hardware.numCpuCores", "summary.hardware.memorySize",
+                "summary.quickStats.overallCpuUsage", "summary.quickStats.overallMemoryUsage",
+                "config.network.vnic", "config.network.pnic", 
+                "config.network.vswitch", "config.network.proxySwitch",
+                "config.virtualNicManagerInfo.netConfig",
+                "datastore"
+            ]
+            
             spec = vim.PropertyFilterSpec(
-                propSet=[vim.PropertySpec(type=vim.HostSystem, pathSet=["name"])],
+                propSet=[vim.PropertySpec(type=vim.HostSystem, pathSet=paths)],
                 objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
             )
             props = self.content.propertyCollector.RetrieveContents([spec])
@@ -275,14 +287,91 @@ class VCenterConnection:
             
             hosts = []
             for obj in props:
-                name = next((p.val for p in obj.propSet if p.name == "name"), "Unknown")
-                hosts.append({
-                    "name": name, 
+                # First, collect all properties into a dictionary for easier access
+                p_dict = {p.name: p.val for p in obj.propSet}
+                
+                d = {
                     "vcenter_id": self.config.id,
-                    "mo_id": obj.obj._moId
-                })
+                    "vcenter_name": self.config.name,
+                    "mo_id": obj.obj._moId,
+                    "name": p_dict.get("name", "Unknown"),
+                    "ip": "Unknown",
+                    "all_ips": [],
+                    "version": p_dict.get("config.product.version", "N/A"),
+                    "build": p_dict.get("config.product.build", "N/A"),
+                    "boot_time": p_dict.get("runtime.bootTime").isoformat() if p_dict.get("runtime.bootTime") else None,
+                    "power_state": p_dict.get("runtime.powerState", "Unknown"),
+                    "cpu_cores": p_dict.get("summary.hardware.numCpuCores", 0),
+                    "memory_total_mb": int(p_dict.get("summary.hardware.memorySize", 0) / (1024*1024)),
+                    "cpu_usage_mhz": p_dict.get("summary.quickStats.overallCpuUsage", 0),
+                    "memory_usage_mb": p_dict.get("summary.quickStats.overallMemoryUsage", 0),
+                    "pnics": [],
+                    "datastores": []
+                }
+                
+                # Map services to vNICs
+                vnic_to_services = {}
+                net_configs = p_dict.get("config.virtualNicManagerInfo.netConfig", [])
+                for nc in net_configs:
+                    service_labels = {
+                        "management": "Management",
+                        "vmotion": "vMotion",
+                        "vsan": "vSAN",
+                        "faultToleranceLogging": "FT",
+                        "vSphereReplication": "Replication",
+                        "vSphereReplicationNFC": "Replication NFC"
+                    }
+                    srv_name = service_labels.get(nc.nicType, nc.nicType)
+                    for vnic_device in (nc.selectedVnic or []):
+                        if vnic_device not in vnic_to_services: vnic_to_services[vnic_device] = []
+                        vnic_to_services[vnic_device].append(srv_name)
+
+                # Map pNICs to switches
+                pnic_to_switch = {}
+                vswitches = p_dict.get("config.network.vswitch", [])
+                for vss in vswitches:
+                    for pnic_id in (vss.pnic or []):
+                        pnic_to_switch[pnic_id] = vss.name
+                
+                proxy_switches = p_dict.get("config.network.proxySwitch", [])
+                for dvs in proxy_switches:
+                    for pnic_key in (dvs.pnic or []):
+                        pnic_to_switch[pnic_key] = dvs.dvsName
+                
+                pnic_list = p_dict.get("config.network.pnic", [])
+                for pnic in pnic_list:
+                    sw_name = pnic_to_switch.get(pnic.key) or pnic_to_switch.get(pnic.device, "Unassigned")
+                    d["pnics"].append({
+                        "device": pnic.device,
+                        "switch": sw_name
+                    })
+                
+                # Process vNICs/IPs
+                vnics = p_dict.get("config.network.vnic", [])
+                for vnic in vnics:
+                    ip = vnic.spec.ip.ipAddress if vnic.spec and vnic.spec.ip else "N/A"
+                    services = vnic_to_services.get(vnic.device, [])
+                    d["all_ips"].append({
+                        "device": vnic.device,
+                        "ip": ip,
+                        "portgroup": vnic.portgroup or "DVS",
+                        "services": services
+                    })
+                    if vnic.device == 'vmk0': d["ip"] = ip
+                
+                if not d["ip"] and d["all_ips"]:
+                    d["ip"] = d["all_ips"][0]["ip"]
+                
+                # Datastores
+                ds_list = p_dict.get("datastore", [])
+                d["datastores"] = [ds.name if hasattr(ds, 'name') else ds._moId for ds in ds_list]
+
+                hosts.append(d)
+                
             return hosts
-        except: return []
+        except Exception as e:
+            logger.error(f"Error fetching hosts: {e}")
+            return []
 
     def get_recent_events(self, minutes=30):
         if not self.content: return []
