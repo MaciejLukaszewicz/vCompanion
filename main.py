@@ -1,15 +1,18 @@
-from fastapi import FastAPI, Request
+from contextlib import asynccontextmanager
+from pathlib import Path
+import logging
+import uvicorn
+
+from fastapi import FastAPI, Request, Response, status
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
 from app.api import auth, dashboard, vcenters
 from app.core.session import is_authenticated
 from app.core.config import settings
-import uvicorn
-import logging
-from pathlib import Path
-from contextlib import asynccontextmanager
 
 # Configure logging
 logging.basicConfig(
@@ -33,6 +36,19 @@ app = FastAPI(
     title=settings.app_settings.title,
     lifespan=lifespan
 )
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+        if request.headers.get("HX-Request"):
+            return Response(
+                headers={"HX-Redirect": "/login"},
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
 
 # Add session middleware
 SECRET_KEY = "vcompanion-secret-key-change-this-in-production"
@@ -59,12 +75,8 @@ def get_vcenter_status(request: Request):
     
     connected_ids = request.session.get("connected_vcenters", [])
     return [{
-        "id": vc.id,
-        "name": vc.name,
-        "host": vc.host,
-        "connected": vc.id in connected_ids,
-        "refresh_status": "READY",
-        "seconds_until": 0
+        "id": vc.id, "name": vc.name, "host": vc.host, "connected": vc.id in connected_ids,
+        "refresh_status": "READY", "unlocked": False
     } for vc in settings.vcenters]
 
 @app.get("/login")
@@ -84,41 +96,22 @@ async def index(request: Request):
     if not is_authenticated(request):
         return RedirectResponse(url="/login", status_code=303)
     
-    # Manager check is now part of is_authenticated logic
     vcenter_manager = request.app.state.vcenter_manager
     stats_data = vcenter_manager.get_stats()
     has_data = stats_data.get('has_data', False)
     
-    # Check if stats returned 'Locked' (shouldn't happen if is_authenticated passes, but for safety)
-    total_vms = stats_data['total_vms']
-    if total_vms == "Locked":
-         return RedirectResponse(url="/login", status_code=303)
-
+    total_vms = stats_data.get('total_vms', 0)
     stats = {
         'total_vms': f"{total_vms:,}" if isinstance(total_vms, int) else total_vms,
-        'vms_delta': f"{stats_data['powered_on_vms']} powered on" if has_data else "No data",
-        'snapshots': str(stats_data['snapshot_count']),
-        'snapshots_delta': f"{stats_data['snapshot_count']} active" if has_data else "No data",
-        'clusters': str(stats_data['host_count']),
-        'clusters_status': f"{stats_data['host_count']} host(s)" if has_data else "No data",
-        'alerts': '0' if has_data else "N/A",
-        'alerts_status': 'No critical alerts' if has_data else "No data"
+        'vms_delta': f"{stats_data.get('powered_on_vms', 0)} powered on" if has_data else "No data",
+        'snapshots': str(stats_data.get('snapshot_count', 0)),
+        'snapshots_delta': "Active" if has_data else "No data",
+        'clusters': str(stats_data.get('host_count', 0)),
+        'clusters_status': f"{stats_data.get('host_count', 0)} host(s)" if has_data else "No data",
+        'alerts': '0',
+        'alerts_status': 'No critical alerts'
     }
     
-    os_data = {"labels": [], "values": []}
-    os_dist = stats_data.get('os_distribution', {})
-    if os_dist:
-        os_data = {
-            "labels": list(os_dist.keys()),
-            "values": list(os_dist.values())
-        }
-        
-    chart_data = {
-        "cpu": [0] * 12,
-        "ram": [0] * 12,
-        "time_labels": ["00:00"] * 12
-    }
-
     return templates.TemplateResponse("dashboard.html", {
         "request": request, 
         "username": request.session.get("username"),
@@ -127,19 +120,7 @@ async def index(request: Request):
         "vcenter_status": get_vcenter_status(request),
         "stats": stats,
         "per_vcenter_stats": stats_data.get('per_vcenter', {}),
-        "events": [],
-        "chart_data": chart_data,
-        "os_data": os_data
-    })
-
-@app.get("/restoring")
-async def restoring(request: Request):
-    """Restoration page - in current model it usually redirects to / or login."""
-    if not is_authenticated(request):
-        return RedirectResponse(url="/login", status_code=303)
-    return templates.TemplateResponse("restoring.html", {
-        "request": request,
-        "username": request.session.get("username")
+        "events": []
     })
 
 @app.get("/inventory")

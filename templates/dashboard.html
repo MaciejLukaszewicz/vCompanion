@@ -23,21 +23,8 @@
     {% include "partials/stats_grid.html" %}
 </section>
 
-
-<!-- Charts Row -->
-<section class="charts-row">
-    <div class="chart-container">
-        <h2>Resource Consumption (Last 24h)</h2>
-        <div id="mainChart"></div>
-    </div>
-    <div class="chart-container">
-        <h2>VM Distribution by OS</h2>
-        <div id="donutChart"></div>
-    </div>
-</section>
-
 <!-- Recent Events Table -->
-<section class="table-container">
+<section class="table-container" style="margin-top: 2rem;">
     <div
         style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
         <h2 style="font-size: 1rem; font-weight: 600;">Recent Critical Events</h2>
@@ -66,8 +53,11 @@
             {% endfor %}
             {% else %}
             <tr>
-                <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 2rem;">
-                    Loading events...
+                <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 4rem;">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                        <i data-lucide="info" size="32"></i>
+                        <p>Waiting for infrastructure data updates...</p>
+                    </div>
                 </td>
             </tr>
             {% endif %}
@@ -78,32 +68,7 @@
 
 {% block extra_scripts %}
 <script>
-    // Resource Consumption Chart
-    var areaOptions = {
-        series: [
-            { name: 'CPU Usage %', data: {{ chart_data.cpu | tojson | safe }} },
-    { name: 'RAM Usage %', data: { { chart_data.ram | tojson | safe } } }
-    ],
-    chart: { height: 300, type: 'area', toolbar: { show: false }, background: 'transparent', foreColor: '#94a3b8' },
-    colors: ['#3b82f6', '#8b5cf6'],
-        dataLabels: { enabled: false },
-    stroke: { curve: 'smooth', width: 2 },
-    grid: { borderColor: 'rgba(255, 255, 255, 0.05)', xaxis: { lines: { show: true } } },
-    xaxis: { categories: { { chart_data.time_labels | tojson | safe } } },
-    tooltip: { theme: 'dark' },
-    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1, stops: [0, 90, 100] } }
-};
-    new ApexCharts(document.querySelector("#mainChart"), areaOptions).render();
-
-    // OS Distribution Chart
-    var donutOptions = {
-        series: {{ os_data['values'] | tojson | safe }},
-    labels: { { os_data.labels | tojson | safe } },
-    chart: { type: 'donut', height: 300, foreColor: '#94a3b8' },
-    colors: ['#3b82f6', '#8b5cf6', '#f59e0b'],
-        plotOptions: { pie: { donut: { size: '75%', labels: { show: true, total: { show: true, label: 'Total VMs', color: '#f8fafc' } } } } },
-    stroke: { show: false }, legend: { position: 'bottom' }, tooltip: { theme: 'dark' }
-};
-    new ApexCharts(document.querySelector("#donutChart"), donutOptions).render();
+    // Lucide icons refresh
+    lucide.createIcons();
 </script>
 {% endblock %}

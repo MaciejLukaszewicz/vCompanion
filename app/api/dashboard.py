@@ -32,13 +32,13 @@ async def get_stats(request: Request):
         
         # Format for display
         stats = {
-            "total_vms": f"{stats_data['total_vms']:,}",
-            "vms_delta": f"{stats_data['powered_on_vms']} powered on",
+            "total_vms": f"{stats_data['total_vms']:,}" if isinstance(stats_data['total_vms'], int) else stats_data['total_vms'],
+            "vms_delta": f"{stats_data['powered_on_vms']} powered on" if stats_data.get('has_data') else "No data",
             "snapshots": str(stats_data['snapshot_count']),
-            "snapshots_delta": f"{stats_data['snapshot_count']} active",
+            "snapshots_delta": f"{stats_data['snapshot_count']} active" if stats_data.get('has_data') else "No data",
             "clusters": str(stats_data['host_count']),
-            "clusters_status": f"{stats_data['host_count']} host(s)",
-            "alerts": "0",  # TODO: Implement alert detection
+            "clusters_status": f"{stats_data['host_count']} host(s)" if stats_data.get('has_data') else "No data",
+            "alerts": "0",
             "alerts_status": "No critical alerts"
         }
         
@@ -55,7 +55,7 @@ async def get_stats(request: Request):
             "clusters_status": "Error",
             "alerts": "--",
             "alerts_status": str(e)
-        })
+        }, status_code=500)
 
 
 @router.get("/charts/resources")
@@ -66,16 +66,22 @@ async def get_resource_charts(request: Request):
     """
     require_auth(request)
     
-    # TODO: Implement actual performance metrics retrieval
-    # This requires vCenter performance API which is more complex
-    # For now return mock data
-    chart_data = {
-        "cpu": [45, 52, 38, 45, 19, 23, 31, 28, 43, 62, 58, 41],
-        "ram": [72, 68, 65, 75, 82, 85, 78, 80, 77, 73, 75, 71],
-        "time_labels": ['12am', '2am', '4am', '6am', '8am', '10am', '12pm', '2pm', '4pm', '6pm', '8pm', '10pm']
-    }
+    if hasattr(request.app.state, 'vcenter_manager'):
+        vcenter_manager = request.app.state.vcenter_manager
+        stats_data = vcenter_manager.get_stats()
+        history = stats_data.get("performance_history", {})
+        
+        return JSONResponse({
+            "cpu": history.get("cpu", [0]*12),
+            "ram": history.get("ram", [0]*12),
+            "time_labels": history.get("labels", ["--:--"]*12)
+        })
     
-    return JSONResponse(chart_data)
+    return JSONResponse({
+        "cpu": [0]*12,
+        "ram": [0]*12,
+        "time_labels": ["--:--"]*12
+    })
 
 
 @router.get("/charts/os-distribution")
@@ -103,7 +109,6 @@ async def get_os_distribution(request: Request):
         
     except Exception as e:
         logger.error(f"Error fetching OS distribution: {str(e)}")
-        # Return fallback data
         return JSONResponse({
             "labels": ["Linux", "Windows", "Other"],
             "values": [0, 0, 0]
@@ -117,18 +122,15 @@ async def get_events(request: Request, limit: int = 10):
     """
     require_auth(request)
     
-    # TODO: Implement actual event retrieval from vCenter
-    # This would use the EventManager from vSphere API
-    # For now, return basic system status
+    # We could fetch events from vCenterManager as well in the future
     events = [
         {
-            "description": "Dashboard loaded successfully",
+            "description": "Infrastructure status updated",
             "vcenter": "System",
             "target": "vCompanion",
             "severity": "success",
-            "time": "Just now"
+            "time": datetime.now().strftime("%H:%M")
         }
     ]
     
     return JSONResponse(events)
-

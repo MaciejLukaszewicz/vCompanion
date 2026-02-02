@@ -7,11 +7,15 @@ import logging
 router = APIRouter(prefix="/api/vcenters")
 logger = logging.getLogger(__name__)
 
+def auth_redirect_response():
+    """Returns a 401 response with HX-Redirect header for HTMX."""
+    return Response(status_code=401, headers={"HX-Redirect": "/login"})
+
 @router.get("/status-bar")
 async def get_status_bar(request: Request):
     """Returns the partial HTML for the vCenter status bar."""
     if not is_authenticated(request):
-        return Response(status_code=401)
+        return auth_redirect_response()
         
     from main import templates, get_vcenter_status
     vcenter_status = get_vcenter_status(request)
@@ -38,7 +42,7 @@ async def get_status_bar(request: Request):
 async def refresh_vcenter(vc_id: str, request: Request):
     """Triggers a manual refresh for a specific vCenter."""
     if not is_authenticated(request):
-        return Response(status_code=401)
+        return auth_redirect_response()
         
     if hasattr(request.app.state, 'vcenter_manager'):
         vcenter_manager = request.app.state.vcenter_manager
@@ -51,7 +55,7 @@ async def refresh_vcenter(vc_id: str, request: Request):
 async def refresh_all_vcenters(request: Request):
     """Triggers refresh for all connected vCenters."""
     if not is_authenticated(request):
-        return Response(status_code=401)
+        return auth_redirect_response()
         
     if hasattr(request.app.state, 'vcenter_manager'):
         vcenter_manager = request.app.state.vcenter_manager
@@ -64,7 +68,7 @@ async def refresh_all_vcenters(request: Request):
 async def get_stats_cards(request: Request):
     """Returns the partial HTML for the dashboard stats cards."""
     if not is_authenticated(request):
-        return Response(status_code=401)
+        return auth_redirect_response()
         
     if hasattr(request.app.state, 'vcenter_manager'):
         vcenter_manager = request.app.state.vcenter_manager
