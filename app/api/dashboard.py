@@ -46,16 +46,19 @@ async def get_alerts_api(request: Request):
 
 @router.get("/events-table")
 async def get_events_table(request: Request):
-    """Returns partial HTML for the events table."""
     require_auth(request)
-    
     events = []
     if hasattr(request.app.state, 'vcenter_manager'):
-        vcenter_manager = request.app.state.vcenter_manager
-        events = vcenter_manager.get_all_recent_events(minutes=30)
-    
+        events = request.app.state.vcenter_manager.get_all_recent_events(minutes=30)
     from main import templates
-    return templates.TemplateResponse("partials/events_table.html", {
-        "request": request,
-        "events": events
-    })
+    return templates.TemplateResponse("partials/events_table.html", {"request": request, "events": events})
+
+@router.get("/tasks-table")
+async def get_tasks_table(request: Request):
+    """Returns partial HTML for the tasks table."""
+    require_auth(request)
+    tasks = []
+    if hasattr(request.app.state, 'vcenter_manager'):
+        tasks = request.app.state.vcenter_manager.get_all_recent_tasks(minutes=30)
+    from main import templates
+    return templates.TemplateResponse("partials/tasks_table.html", {"request": request, "tasks": tasks})

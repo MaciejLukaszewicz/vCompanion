@@ -129,16 +129,22 @@ class VCenterManager:
         return self.cache.get_cached_stats()
 
     def get_all_recent_events(self, minutes=30):
-        """Fetches live events from all connected vCenters (no cache)."""
         all_events = []
         for vc_id, conn in self.connections.items():
             if conn.is_alive():
                 events = conn.get_recent_events(minutes)
                 all_events.extend(events)
-        
-        # Sort by time descending
         all_events.sort(key=lambda x: x['time'], reverse=True)
         return all_events
+
+    def get_all_recent_tasks(self, minutes=30):
+        all_tasks = []
+        for vc_id, conn in self.connections.items():
+            if conn.is_alive():
+                tasks = conn.get_recent_tasks(minutes)
+                all_tasks.extend(tasks)
+        all_tasks.sort(key=lambda x: x['start_time'] if x['start_time'] else "", reverse=True)
+        return all_tasks
 
 class VCenterConnection:
     def __init__(self, config: VCenterConfig):
@@ -203,100 +209,97 @@ class VCenterConnection:
         except: return []
 
     def get_recent_events(self, minutes=30):
-        """Fetches live events from this vCenter."""
         if not self.content: return []
         try:
-            event_manager = self.content.eventManager
-            filter_spec = vim.event.EventFilterSpec()
             time_limit = datetime.now() - timedelta(minutes=minutes)
-            filter_spec.time = vim.event.EventFilterSpec.ByTime(beginTime=time_limit)
-            
-            events = event_manager.QueryEvents(filter_spec)
-            
+            filter_spec = vim.event.EventFilterSpec(time=vim.event.EventFilterSpec.ByTime(beginTime=time_limit))
+            events = self.content.eventManager.QueryEvents(filter_spec)
             result = []
             for e in events:
-                # Map event types to human readable
-                severity = "info"
-                if isinstance(e, (vim.event.AlarmStatusChangedEvent, vim.event.AlarmActionTriggeredEvent)):
-                    severity = "warning"
+                severity = "warning" if isinstance(e, (vim.event.AlarmStatusChangedEvent, vim.event.AlarmActionTriggeredEvent)) else "info"
+                result.append({
+                    "vcenter_id": self.config.id, "vcenter_name": self.config.name,
+                    "type": e.__class__.__name__.replace("Event", ""),
+                    "message": e.fullFormattedMessage, "user": e.userName or "System",
+                    "time": e.createdTime.isoformat(), "severity": severity
+                })
+            return result
+        except: return []
+
+    def get_recent_tasks(self, minutes=30):
+        """Fetches live tasks from this vCenter."""
+        if not self.content: return []
+        try:
+            time_limit = datetime.now() - timedelta(minutes=minutes)
+            time_filter = vim.TaskFilterSpec.ByTime(beginTime=time_limit, timeType="startedTime")
+            filter_spec = vim.TaskFilterSpec(time=time_filter)
+            
+            collector = self.content.taskManager.CreateCollectorForTasks(filter_spec)
+            try:
+                tasks_list = collector.ReadNextTasks(999)
+            finally:
+                # In vSphere API, HistoryCollectors use DestroyCollector(), not Destroy()
+                if hasattr(collector, 'DestroyCollector'):
+                    collector.DestroyCollector()
+                elif hasattr(collector, 'Destroy'):
+                    collector.Destroy()
+            
+            result = []
+            for t in tasks_list:
+                status = t.state
+                progress = t.progress if t.progress is not None else (100 if status == 'success' else 0)
                 
                 result.append({
                     "vcenter_id": self.config.id,
                     "vcenter_name": self.config.name,
-                    "type": e.__class__.__name__.replace("Event", ""),
-                    "message": e.fullFormattedMessage,
-                    "user": e.userName or "System",
-                    "time": e.createdTime.isoformat(),
-                    "severity": severity
+                    "name": t.descriptionId or "Task",
+                    "entity_name": t.entityName or "Unknown",
+                    "user": t.reason.userName if hasattr(t.reason, 'userName') else "System",
+                    "start_time": t.startTime.isoformat() if t.startTime else None,
+                    "completion_time": t.completeTime.isoformat() if t.completeTime else None,
+                    "status": status,
+                    "progress": progress,
+                    "error": t.error.localizedMessage if t.error else None
                 })
             return result
         except Exception as ex:
-            logger.error(f"Error fetching events from {self.config.name}: {ex}")
+            logger.error(f"Error fetching tasks from {self.config.name}: {ex}")
             return []
 
     def get_alerts_speed(self):
-        """Fetches triggered alarms for VMs, Hosts, Datacenters, Clusters and Folders."""
         if not self.content: return []
         try:
             types = [vim.Datacenter, vim.ComputeResource, vim.ClusterComputeResource, vim.Folder, vim.HostSystem, vim.VirtualMachine]
             view = self.content.viewManager.CreateContainerView(self.content.rootFolder, types, True)
-            
             spec = vim.PropertyFilterSpec(
                 propSet=[vim.PropertySpec(type=vim.ManagedEntity, pathSet=["name", "triggeredAlarmState"])],
                 objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
             )
-            
             props = self.content.propertyCollector.RetrieveContents([spec])
             view.Destroy()
-            
             alerts = []
             for obj in props:
-                name = ""
-                triggered = []
+                name, triggered = "", []
                 for p in obj.propSet:
                     if p.name == "name": name = p.val
                     elif p.name == "triggeredAlarmState": triggered = p.val
-                
                 if not triggered: continue
-                
-                # Get entity type - robust way using class name
-                mo = obj.obj
-                class_name = mo.__class__.__name__
-                if class_name.startswith('vim.'):
-                    class_name = class_name[4:]
-                
-                type_map = {
-                    "VirtualMachine": "VM", 
-                    "HostSystem": "Host", 
-                    "Folder": "Folder",
-                    "ClusterComputeResource": "Cluster", 
-                    "ComputeResource": "Cluster",
-                    "Datacenter": "Datacenter"
-                }
+                class_name = obj.obj.__class__.__name__
+                if class_name.startswith('vim.'): class_name = class_name[4:]
+                type_map = {"VirtualMachine": "VM", "HostSystem": "Host", "Folder": "Folder", "ClusterComputeResource": "Cluster", "ComputeResource": "Cluster", "Datacenter": "Datacenter"}
                 entity_type = type_map.get(class_name, class_name)
-
                 for state in triggered:
                     if state.overallStatus in ['yellow', 'red']:
                         alarm_name = "Unknown Alarm"
                         try:
-                            # Try to get name from alarm info
-                            if state.alarm and hasattr(state.alarm, 'info'):
-                                alarm_name = state.alarm.info.name
-                            else:
-                                alarm_name = str(state.alarm).split(':')[-1].replace("'", "")
+                            if state.alarm and hasattr(state.alarm, 'info'): alarm_name = state.alarm.info.name
+                            else: alarm_name = str(state.alarm).split(':')[-1].replace("'", "")
                         except: pass
-
                         alerts.append({
-                            "vcenter_id": self.config.id,
-                            "vcenter_name": self.config.name,
-                            "entity_name": name,
-                            "entity_type": entity_type,
-                            "alarm_name": alarm_name,
+                            "vcenter_id": self.config.id, "vcenter_name": self.config.name,
+                            "entity_name": name, "entity_type": entity_type, "alarm_name": alarm_name,
                             "severity": "critical" if state.overallStatus == 'red' else "warning",
-                            "status": state.overallStatus,
-                            "time": state.time.isoformat() if state.time else datetime.now().isoformat()
+                            "status": state.overallStatus, "time": state.time.isoformat() if state.time else datetime.now().isoformat()
                         })
             return alerts
-        except Exception as e:
-            logger.error(f"Error fetching alerts: {e}")
-            return []
+        except: return []

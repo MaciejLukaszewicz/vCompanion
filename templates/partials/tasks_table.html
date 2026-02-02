@@ -1,0 +1,51 @@
+<table>
+    <thead>
+        <tr>
+            <th>Start Time</th>
+            <th>Status</th>
+            <th>Task Name</th>
+            <th>Entity</th>
+            <th>vCenter</th>
+            <th>User</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if tasks %}
+        {% for task in tasks %}
+        <tr>
+            <td style="color: var(--text-dim); font-size: 0.75rem; white-space: nowrap;">
+                {{ task.start_time.split('T')[1].split('.')[0] if task.start_time else '--:--' }}
+            </td>
+            <td>
+                {% if task.status == 'running' %}
+                <div style="display: flex; flex-direction: column; gap: 4px; width: 80px;">
+                    <span style="font-size: 0.65rem; color: var(--primary);">RUNNING {{ task.progress }}%</span>
+                    <div style="height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;">
+                        <div
+                            style="height: 100%; width: {{ task.progress }}%; background: var(--primary); box-shadow: 0 0 10px var(--primary-shadow);">
+                        </div>
+                    </div>
+                </div>
+                {% elif task.status == 'success' %}
+                <span class="status-badge success" style="font-size: 0.65rem;">SUCCESS</span>
+                {% elif task.status == 'error' %}
+                <span class="status-badge danger" style="font-size: 0.65rem;" title="{{ task.error }}">ERROR</span>
+                {% else %}
+                <span class="status-badge warning" style="font-size: 0.65rem;">{{ task.status | upper }}</span>
+                {% endif %}
+            </td>
+            <td style="font-weight: 500; font-size: 0.875rem;">{{ task.name }}</td>
+            <td style="font-size: 0.8rem;">{{ task.entity_name }}</td>
+            <td style="font-size: 0.8rem;">{{ task.vcenter_name }}</td>
+            <td style="font-size: 0.8rem; color: var(--primary);">{{ task.user }}</td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 3rem;">
+                No tasks recorded in the last 30 minutes.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
