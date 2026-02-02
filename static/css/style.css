@@ -686,6 +686,47 @@ tr:last-child td {
     font-weight: 500;
 }
 
+.refresh-info {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-left: 0.25rem;
+    border-left: 1px solid var(--border);
+    margin-left: 0.25rem;
+}
+
+.refresh-ready {
+    background: #000 !important;
+}
+
+.refresh-refreshing {
+    background: rgba(234, 179, 8, 0.15) !important;
+    border-color: rgba(234, 179, 8, 0.4) !important;
+}
+
+.refresh-error {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+}
+
+.spin-icon {
+    animation: spin 2s linear infinite;
+    width: 14px;
+    height: 14px;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .btn-login-additional {
     background: transparent;
     color: var(--primary);

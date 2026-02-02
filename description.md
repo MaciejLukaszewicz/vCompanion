@@ -23,15 +23,15 @@ vCompanion is a management tool designed to help administrators oversee multiple
 
 
 ## 3. Features
-- **Unified Inventory**: A clean, consistent view of resources across all connected vCenters.
-- **Global Search**: Search for VMs and IP addresses across all environments simultaneously.
-- **Dashboards**: 
-    - **Default Dashboard**: High-level overview of critical metrics (e.g., issue counts, VM totals, snapshot counts).
-    - **Specialized Dashboards**: Focused views for problems, datastores, hosts, and more.
-- **Session Management**: Persistent sessions after login with a 1-hour inactivity timeout.
-- **Alerting**: Ability to receive alerts for critical events.
-- **Reporting**: Ability to generate reports for critical events.
-- **Extensibility**: Future features will be added based on user feedback.
+- **Unified Inventory**: A clean, consistent view of resources across all connected vCenters, powered by an encrypted (AES-128) JSON caching layer.
+- **Zero-Password-Storage**: For maximum security, vCenter passwords are never stored on disk or in browser cookies.
+- **Volatile RAM Keys**: Encryption keys are derived from user passwords (using PBKDF2) and kept only in volatile memory (RAM).
+- **Background Refresh**: Intelligent background worker that synchronizes data from vCenters every 2 minutes (configurable).
+- **Dashboard Cache**: Displays cached data immediately after login, with background updates ensuring the UI stays fresh without blocking the user.
+- **Dynamic Status Indicators**: Real-time status pills in the header showing connection states and refresh progress with countdown timers.
+- **Global Search**: Search for VMs and IP addresses across all environments simultaneously using indexed cached data.
+- **Session Management**: Secure sessions after login with a 1-hour inactivity timeout. Server restarts invalidate keys for security.
+- **Alerting & Reporting**: Integrated reporting capabilities (Excel/Pandas) for critical events and inventory.
 
 ## 4. Architecture Diagram
 

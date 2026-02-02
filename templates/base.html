@@ -67,20 +67,15 @@
         <!-- vCenter Status Bar -->
         {% if vcenter_status %}
         <div class="vcenter-status-bar">
-            <div class="vcenter-status-container">
-                {% for vc in vcenter_status %}
-                <div class="vcenter-pill {% if vc.connected %}connected{% else %}disconnected{% endif %}"
-                    data-vcenter-id="{{ vc.id }}" {% if not vc.connected %}onclick="openLoginModal('{{ vc.id }}')" {%
-                    endif %}>
-                    <span class="status-indicator"></span>
-                    <span class="vcenter-name">{{ vc.name }}</span>
-                </div>
-                {% endfor %}
-                <button class="btn-login-additional" onclick="openLoginModal()">
-                    <i data-lucide="plus-circle"></i>
-                    Connect More
-                </button>
+            <div class="vcenter-status-container" hx-get="/api/vcenters/status-bar" hx-trigger="every 5s"
+                hx-swap="innerHTML">
+                {% include "partials/vcenter_status_bar.html" %}
             </div>
+
+            <button class="btn-login-additional" onclick="openLoginModal()">
+                <i data-lucide="plus"></i>
+                Connect Additional
+            </button>
         </div>
         {% endif %}
 

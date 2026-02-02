@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
-from app.core.session import require_auth, get_session_credentials
+from app.core.session import require_auth
 from app.services.vcenter_service import VCenterManager
 from app.core.config import settings
 import logging

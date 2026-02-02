@@ -18,76 +18,10 @@
 </header>
 
 <!-- Stats Grid -->
-<section class="stats-grid">
-    <div class="stat-card">
-        <h3>Total Virtual Machines</h3>
-        <div class="value">{{ stats.total_vms | default('--') }}</div>
-        <div class="delta up"><i data-lucide="trending-up"></i> {{ stats.vms_delta | default('Loading...') }}</div>
-
-        {% if per_vcenter_stats %}
-        <div class="stat-breakdown">
-            {% for vc_id, vc in per_vcenter_stats.items() %}
-            <div class="breakdown-item">
-                <span>{{ vc.name }}</span>
-                <strong>{{ vc.vms }}</strong>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-
-    <div class="stat-card">
-        <h3>Active Snapshots</h3>
-        <div class="value">{{ stats.snapshots | default('--') }}</div>
-        <div class="delta down"><i data-lucide="trending-down"></i> {{ stats.snapshots_delta | default('Loading...') }}
-        </div>
-
-        {% if per_vcenter_stats %}
-        <div class="stat-breakdown">
-            {% for vc_id, vc in per_vcenter_stats.items() %}
-            <div class="breakdown-item">
-                <span>{{ vc.name }}</span>
-                <strong>{{ vc.snapshots }}</strong>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-
-    <div class="stat-card">
-        <h3>Host Clusters</h3>
-        <div class="value">{{ stats.clusters | default('--') }}</div>
-        <div class="delta" style="color: var(--text-dim)">{{ stats.clusters_status | default('Loading...') }}</div>
-
-        {% if per_vcenter_stats %}
-        <div class="stat-breakdown">
-            {% for vc_id, vc in per_vcenter_stats.items() %}
-            <div class="breakdown-item">
-                <span>{{ vc.name }}</span>
-                <strong>{{ vc.hosts }}</strong>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-
-    <div class="stat-card">
-        <h3>Critical Alerts</h3>
-        <div class="value" style="color: var(--danger)">{{ stats.alerts | default('--') }}</div>
-        <div class="delta up" style="color: var(--danger)">{{ stats.alerts_status | default('Loading...') }}</div>
-
-        {% if per_vcenter_stats %}
-        <div class="stat-breakdown">
-            {% for vc_id, vc in per_vcenter_stats.items() %}
-            <div class="breakdown-item">
-                <span>{{ vc.name }}</span>
-                <strong>0</strong>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
+<section class="stats-grid" hx-get="/api/vcenters/stats-cards" hx-trigger="every 10s" hx-swap="innerHTML">
+    {% include "partials/stats_grid.html" %}
 </section>
+
 
 <!-- Charts Row -->
 <section class="charts-row">

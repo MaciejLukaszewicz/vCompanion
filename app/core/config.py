@@ -14,6 +14,7 @@ class AppSettings(BaseModel):
     title: str = "vCompanion"
     session_timeout: int = 3600
     log_level: str = "INFO"
+    refresh_interval_seconds: int = 120
 
 class Config(BaseModel):
     app_settings: AppSettings = AppSettings()

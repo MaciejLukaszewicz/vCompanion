@@ -1,0 +1,26 @@
+{% for vc in vcenter_status %}
+<div class="vcenter-pill {{ 'connected' if vc.connected else 'disconnected' }} refresh-{{ vc.refresh_status | lower }}"
+    data-vcenter-id="{{ vc.id }}" {% if vc.refresh_status !='REFRESHING' %} hx-post="/api/vcenters/refresh/{{ vc.id }}"
+    hx-trigger="click" hx-swap="none" title="Click to refresh manually" style="cursor: pointer;" {% endif %}>
+
+    <span class="status-indicator"></span>
+
+    <span class="vcenter-name">{{ vc.name }}</span>
+
+    <div class="refresh-info">
+        {% if vc.refresh_status == 'REFRESHING' %}
+        <i data-lucide="loader-2" class="spin-icon"></i>
+        {% elif vc.refresh_status == 'ERROR' %}
+        <i data-lucide="alert-circle" style="color: var(--danger); width: 14px; height: 14px;"></i>
+        {% else %}
+        <span class="refresh-timer">{{ vc.seconds_until }}s</span>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+<script>
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+</script>
