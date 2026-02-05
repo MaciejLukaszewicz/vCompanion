@@ -1,0 +1,94 @@
+<table class="inventory-list-table">
+    <thead>
+        <tr>
+            <th style="width: 20%">Name</th>
+            <th style="width: 35%">FQDN / VAMI</th>
+            <th style="width: 25%">Version / Build</th>
+            <th style="width: 20%">Last Sync</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if vcenters %}
+        {% for vc in vcenters %}
+        <tr class="vcenter-row">
+            <td style="font-weight: 600; color: var(--text-main);">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span
+                        class="status-indicator {{ 'status-ready' if vc.status == 'READY' else 'status-error' }}"></span>
+                    {{ vc.name }}
+                </div>
+            </td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <a href="https://{{ vc.fqdn or vc.host }}/ui" target="_blank" class="external-link"
+                        title="vSphere Client">
+                        {{ vc.fqdn or vc.host }}
+                        <i data-lucide="external-link" size="12"></i>
+                    </a>
+                    <span style="opacity: 0.3;">|</span>
+                    <a href="https://{{ vc.fqdn or vc.host }}:5480" target="_blank" class="external-link"
+                        title="vCenter Appliance Management Interface" style="color: var(--warning);">
+                        VAMI
+                        <i data-lucide="settings" size="12"></i>
+                    </a>
+                </div>
+            </td>
+            <td style="font-size: 0.85rem; color: var(--text-dim);">
+                {% if vc.version %}
+                <span style="color: var(--text-main);">{{ vc.version }}</span>
+                <span style="opacity: 0.5;">(Build {{ vc.build }})</span>
+                {% else %}
+                <span style="opacity: 0.5;">--</span>
+                {% endif %}
+            </td>
+            <td style="font-size: 0.8rem; color: var(--text-dim);">
+                {{ vc.last_refresh.replace('T', ' ').split('.')[0] if vc.last_refresh else '--' }}
+            </td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+            <td colspan="4" style="text-align: center; padding: 3rem; color: var(--text-dim);">
+                No vCenter details available.
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<style>
+    .external-link {
+        color: var(--primary);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: color 0.2s;
+    }
+
+    .external-link:hover {
+        color: #60a5fa;
+        text-decoration: underline;
+    }
+
+    .vcenter-row td {
+        vertical-align: middle;
+    }
+
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .status-ready {
+        background: var(--success);
+        box-shadow: 0 0 6px var(--success);
+    }
+
+    .status-error {
+        background: var(--danger);
+        box-shadow: 0 0 6px var(--danger);
+    }
+</style>

@@ -85,7 +85,7 @@
     </section>
 
     <!-- Global Snapshots Section -->
-    <section class="table-container" id="snapshots-section">
+    <section class="table-container" id="snapshots-section" style="margin-bottom: 1rem;">
         <div
             style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
             <div style="display: flex; align-items: center; gap: 1.5rem;">
@@ -127,7 +127,7 @@
     </section>
 
     <!-- Hosts Section -->
-    <section class="table-container" id="hosts-section">
+    <section class="table-container" id="hosts-section" style="margin-bottom: 1rem;">
         <div onclick="toggleInventorySection('hosts-content', 'hosts-toggle-icon')"
             style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02);">
             <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem;">
@@ -154,6 +154,25 @@
                     <i data-lucide="server" size="48" style="margin-bottom: 1rem; opacity: 0.2;"></i>
                     <p>Select an ESXi host to view hardware, version, and performance details.</p>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- vCenter Management Section -->
+    <section class="table-container" id="vcenters-section" style="margin-bottom: 2rem;">
+        <div onclick="toggleInventorySection('vcenters-content', 'vcenters-toggle-icon')"
+            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02);">
+            <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem;">
+                <i data-lucide="shield" size="18" style="color: var(--primary);"></i> Connected vCenter Servers
+            </h2>
+            <div id="vcenters-toggle-icon" style="transition: transform 0.3s ease;">
+                <i data-lucide="chevron-down"></i>
+            </div>
+        </div>
+        <div id="vcenters-content" style="display: none; height: auto; max-height: 400px; overflow-y: auto;"
+            hx-get="/api/inventory/vcenters" hx-trigger="load" hx-target="#vcenters-list-target">
+            <div id="vcenters-list-target">
+                <div style="padding: 2rem; text-align: center; color: var(--text-dim);">Loading vCenter details...</div>
             </div>
         </div>
     </section>
@@ -373,6 +392,6 @@
         }
     }
 
-    lucide.createIcons();
+
 </script>
 {% endblock %}

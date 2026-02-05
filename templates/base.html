@@ -273,20 +273,24 @@
             successDiv.style.display = 'flex';
             refreshIcons();
         }
-        function refreshIcons() {
+        function refreshIcons(target = document.body) {
             if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
+                lucide.createIcons({
+                    root: target
+                });
             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             refreshIcons();
-            setTimeout(refreshIcons, 100);
-            setTimeout(refreshIcons, 500); // Extra safety
         });
 
-        // Refresh icons after HTMX content updates
-        document.body.addEventListener('htmx:afterOnLoad', refreshIcons);
+        // Optimize: Refresh icons ONLY in the updated part of the DOM
+        document.body.addEventListener('htmx:afterOnLoad', (evt) => {
+            if (evt.detail.target) {
+                refreshIcons(evt.detail.target);
+            }
+        });
 
         // Server Health Monitoring
         let isDisconnected = false;

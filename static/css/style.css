@@ -301,18 +301,18 @@ aside+main header {
 }
 
 .stat-card {
-    background: var(--glass);
-    backdrop-filter: blur(12px);
+    background: var(--surface);
     border: 1px solid var(--border);
     padding: 1.5rem;
     border-radius: 1rem;
-    transition: transform 0.2s ease;
+    transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .stat-card.alert-card {
     grid-column: span 2;
 }
 
+/* Performance Optimization: Selective animations */
 .stat-card:hover {
     transform: translateY(-4px);
     border-color: var(--primary);

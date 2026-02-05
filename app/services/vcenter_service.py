@@ -81,12 +81,18 @@ class VCenterManager:
             vms = conn.get_vms_speed(hosts)
             self.cache.save_vms(vc_id, vms)
             
-            # 3. Fetch Alerts
-            alerts = conn.get_alerts_speed()
-            self.cache.save_alerts(vc_id, alerts)
+            # 4. Fetch About info (version, build, etc.)
+            about = conn.content.about
+            metadata = {
+                "version": about.version,
+                "build": about.build,
+                "full_name": about.fullName,
+                "api_type": about.apiType,
+                "fqdn": conn.config.host
+            }
             
-            self.cache.update_vcenter_status(vc_id, conn.config.name, 'READY')
-            logger.info(f"===> [{conn.config.name}] REFRESH SUCCESSFUL")
+            self.cache.update_vcenter_status(vc_id, conn.config.name, 'READY', metadata=metadata)
+            logger.info(f"===> [{conn.config.name}] REFRESH SUCCESSFUL (v{about.version})")
             
         except Exception as e:
             logger.error(f"Refresh task failed for {vc_id}: {e}")

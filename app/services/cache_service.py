@@ -64,9 +64,18 @@ class CacheService:
                     if isinstance(loaded, dict): self._data[key].update(loaded)
                 except: pass
 
-    def update_vcenter_status(self, vc_id: str, name: str, status: str, error: str = None):
+    def update_vcenter_status(self, vc_id: str, name: str, status: str, error: str = None, metadata: dict = None):
         if not self._is_unlocked: return
-        self._data["vcenters"][vc_id] = {"id": vc_id, "name": name, "last_refresh": datetime.now().isoformat(), "status": status, "error_message": error}
+        data = {
+            "id": vc_id, 
+            "name": name, 
+            "last_refresh": datetime.now().isoformat(), 
+            "status": status, 
+            "error_message": error
+        }
+        if metadata:
+            data.update(metadata)
+        self._data["vcenters"][vc_id] = data
         self._save_to_disk()
 
     def get_vcenter_status(self, vc_id: str = None):

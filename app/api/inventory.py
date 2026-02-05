@@ -243,3 +243,21 @@ async def get_snapshots_partial(request: Request, today_only: bool = False):
         "global_snapshots": global_snapshots,
         "snap_count": len(global_snapshots)
     })
+
+@router.get("/vcenters")
+async def get_vcenters_partial(request: Request):
+    """Returns the vCenters list partial for inventory."""
+    require_auth(request)
+    if not hasattr(request.app.state, 'vcenter_manager'):
+        return HTMLResponse("<p>Manager not ready</p>")
+        
+    vcenter_statuses = request.app.state.vcenter_manager.cache.get_vcenter_status()
+    
+    # Sort by name
+    vcenter_statuses.sort(key=lambda x: x.get('name', '').lower())
+    
+    from main import templates
+    return templates.TemplateResponse("partials/inventory_vcenters_list.html", {
+        "request": request,
+        "vcenters": vcenter_statuses
+    })
