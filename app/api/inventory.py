@@ -180,3 +180,66 @@ async def get_host_details(request: Request, vcenter_id: str, mo_id: str):
         "request": request,
         "host": host
     })
+@router.get("/snapshots")
+async def get_snapshots_partial(request: Request, today_only: bool = False):
+    """Returns a global list of snapshots across all vCenters."""
+    require_auth(request)
+    if not hasattr(request.app.state, 'vcenter_manager'):
+        return HTMLResponse("<p>Manager not ready</p>")
+        
+    vms = request.app.state.vcenter_manager.cache.get_all_vms()
+    
+    global_snapshots = []
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    # Assign color index based on stable hash of vcenter_id
+    def get_vc_color(vc_id):
+        import hashlib
+        return int(hashlib.md5(vc_id.encode()).hexdigest(), 16) % 5
+
+    # Calculate age in days
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    
+    for vm in vms:
+        if vm.get('snapshots'):
+            for snap in vm['snapshots']:
+                created_date_str = snap.get('created', '')
+                try:
+                    # Parse created date
+                    created_date_dt = datetime.fromisoformat(created_date_str)
+                    # Convert to UTC if it has tz info, else assume UTC for calculation
+                    if created_date_dt.tzinfo is None:
+                        created_date_dt = created_date_dt.replace(tzinfo=timezone.utc)
+                    
+                    age_delta = now - created_date_dt
+                    age_days = age_delta.days
+                except:
+                    age_days = 0
+
+                created_date = created_date_str.split('T')[0]
+                if today_only and created_date != today_str:
+                    continue
+                    
+                global_snapshots.append({
+                    "vm_id": vm.get('id'),
+                    "vm_name": vm.get('name'),
+                    "vcenter_id": vm.get('vcenter_id'),
+                    "vcenter_name": vm.get('vcenter_name'),
+                    "vc_color_index": get_vc_color(vm.get('vcenter_id', '')),
+                    "name": snap.get('name'),
+                    "description": snap.get('description'),
+                    "created": snap.get('created'),
+                    "age_days": age_days
+                })
+                
+    # Sort by creation date (newest first)
+    global_snapshots.sort(key=lambda x: x.get('created', ''), reverse=True)
+    
+    from main import templates
+    return templates.TemplateResponse("partials/snapshots_table.html", {
+        "request": request,
+        "global_snapshots": global_snapshots,
+        "snap_count": len(global_snapshots)
+    })

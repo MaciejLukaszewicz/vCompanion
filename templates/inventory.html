@@ -84,6 +84,48 @@
         </div>
     </section>
 
+    <!-- Global Snapshots Section -->
+    <section class="table-container" id="snapshots-section">
+        <div
+            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+            <div style="display: flex; align-items: center; gap: 1.5rem;">
+                <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;"
+                    onclick="toggleInventorySection('snapshots-content', 'snapshots-toggle-icon')">
+                    <i data-lucide="camera" size="18" style="color: var(--accent);"></i> Global Snapshots
+                    <span id="snap-count-badge" class="badge-accent" style="margin-left: 0.5rem;">{{ snap_count or 0
+                        }}</span>
+                </h2>
+
+                <!-- Snapshot Filters -->
+                <form id="snap-filters" style="display: flex; align-items: center; gap: 1rem;"
+                    hx-get="/api/inventory/snapshots" hx-target="#snapshots-list-target" hx-trigger="change">
+                    <label
+                        style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;">
+                        <div class="switch">
+                            <input type="checkbox" name="today_only" value="true" hx-trigger="change">
+                            <span class="slider"></span>
+                        </div>
+                        <span style="font-size: 0.85rem; color: var(--text-dim);">Taken today</span>
+                    </label>
+                </form>
+            </div>
+
+            <div id="snapshots-toggle-icon" style="transition: transform 0.3s ease; cursor: pointer;"
+                onclick="toggleInventorySection('snapshots-content', 'snapshots-toggle-icon')">
+                <i data-lucide="chevron-down"></i>
+            </div>
+        </div>
+        <div id="snapshots-content" style="display: none; height: 400px; overflow-y: auto;"
+            hx-get="/api/inventory/snapshots" hx-trigger="load" hx-target="#snapshots-list-target">
+            <div id="snapshots-list-target">
+                <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
+                    <div class="spinner-small" style="margin-bottom: 1rem;"></div>
+                    Loading global snapshots...
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Hosts Section -->
     <section class="table-container" id="hosts-section">
         <div onclick="toggleInventorySection('hosts-content', 'hosts-toggle-icon')"
@@ -316,6 +358,19 @@
         clearBtn.style.display = 'none';
         // Manually trigger HTMX update
         htmx.trigger('#vm-search', 'keyup');
+    }
+
+    function syncVmSelection(vcenterId, vmId) {
+        // Remove selection from ALL rows in both lists
+        document.querySelectorAll('.vm-row').forEach(r => r.classList.remove('selected'));
+
+        // Find the specific VM row in the Virtual Machines list
+        const vmRow = document.querySelector(`.inventory-list-pane tr[data-vm-id="${vmId}"][data-vcenter-id="${vcenterId}"]`);
+        if (vmRow) {
+            vmRow.classList.add('selected');
+            // Scroll into view if not visible
+            vmRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
     }
 
     lucide.createIcons();
