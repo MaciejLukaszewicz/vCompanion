@@ -82,8 +82,8 @@ async def get_stats_cards(request: Request):
             'snapshots_delta': f"{stats_data['snapshot_count']} active" if has_data else "No data",
             'clusters': str(stats_data['host_count']),
             'clusters_status': f"{stats_data['host_count']} host(s)" if has_data else "No data",
-            'alerts': '0' if has_data else "N/A",
-            'alerts_status': 'No critical alerts' if has_data else "No data"
+            'critical_alerts': stats_data.get('critical_alerts', 0),
+            'warning_alerts': stats_data.get('warning_alerts', 0)
         }
         
         from main import templates

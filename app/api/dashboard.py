@@ -45,22 +45,47 @@ async def get_alerts_api(request: Request):
     return JSONResponse([])
 
 @router.get("/events-table")
-async def get_events_table(request: Request):
+async def get_events_table(request: Request, filter_logon: bool = True):
     require_auth(request)
+    logger.info(f"API: Received request for recent events (filter_logon={filter_logon})")
     events = []
     if hasattr(request.app.state, 'vcenter_manager'):
         # Reduced to 5 minutes as requested
         events = request.app.state.vcenter_manager.get_all_recent_events(minutes=5)
+    
+    if filter_logon:
+        # Filter out logon/logoff events. 
+        # Check for types like UserLoginSession, UserLogoutSession, and related variants.
+        original_count = len(events)
+        
+        # Robust filtering: check if ANY of our ignored strings are in the event type name
+        events = [e for e in events if not any(sub in e.get("type", "") for sub in ["UserLogin", "UserLogout"])]
+        
+        logger.info(f"API: Filtered out {original_count - len(events)} logon/logoff events")
+    
+    # Extra debug: log the unique types being returned to help diagnose
+    if events:
+        unique_types = set(e.get("type") for e in events)
+        logger.info(f"API: Unique event types in result: {unique_types}")
+        
     from main import templates
+    logger.info(f"API: Returning {len(events)} events")
     return templates.TemplateResponse("partials/events_table.html", {"request": request, "events": events})
 
 @router.get("/tasks-table")
-async def get_tasks_table(request: Request):
+async def get_tasks_table(request: Request, active_only: bool = False):
     require_auth(request)
+    logger.info(f"API: Received request for recent tasks (active_only={active_only})")
     tasks = []
     if hasattr(request.app.state, 'vcenter_manager'):
         tasks = request.app.state.vcenter_manager.get_all_recent_tasks(minutes=30)
+    
+    if active_only:
+        # Active only means running or queued
+        tasks = [t for t in tasks if t.get("status") in ["running", "queued"]]
+        
     from main import templates
+    logger.info(f"API: Returning {len(tasks)} tasks")
     return templates.TemplateResponse("partials/tasks_table.html", {"request": request, "tasks": tasks})
 
 @router.get("/alerts-table")

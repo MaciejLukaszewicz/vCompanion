@@ -27,47 +27,63 @@
             {% endif %}
 
             <form method="POST" action="/api/auth/login" class="login-form" id="loginForm">
-                <!-- ... form contents ... -->
-                <div class="form-group">
-                    <label for="username">
-                        <i data-lucide="user"></i>
-                        Username
-                    </label>
-                    <input type="text" id="username" name="username" placeholder="vCenter username" required autofocus>
-                </div>
-
-                <div class="form-group">
-                    <label for="password">
-                        <i data-lucide="lock"></i>
-                        Password
-                    </label>
-                    <input type="password" id="password" name="password" placeholder="vCenter password" required>
-                </div>
-
-                <div class="form-group">
-                    <label style="margin-bottom: 0.75rem; display: block;">
-                        <i data-lucide="server"></i>
-                        Select vCenter Servers
-                    </label>
-                    <div class="vcenter-list">
-                        {% for vcenter in vcenters %}
-                        <div class="vcenter-checkbox">
-                            <input type="checkbox" id="vc_{{ vcenter.id }}" value="{{ vcenter.id }}" checked>
-                            <label for="vc_{{ vcenter.id }}">
-                                <strong>{{ vcenter.name }}</strong>
-                                <span class="vcenter-host">{{ vcenter.host }}</span>
+                <div class="login-columns">
+                    <div class="login-left">
+                        <div class="form-group">
+                            <label for="username">
+                                <i data-lucide="user"></i>
+                                Username
                             </label>
+                            <input type="text" id="username" name="username" placeholder="vCenter username" required
+                                autofocus>
                         </div>
-                        {% endfor %}
+
+                        <div class="form-group">
+                            <label for="password">
+                                <i data-lucide="lock"></i>
+                                Password
+                            </label>
+                            <input type="password" id="password" name="password" placeholder="vCenter password"
+                                required>
+                        </div>
+
+                        <button type="submit" class="btn-primary">
+                            <i data-lucide="log-in"></i>
+                            Sign In
+                        </button>
+
+                        <div class="login-info" id="loginInfo">
+                            <i data-lucide="info"></i>
+                            <p>Your credentials will be used to authenticate with all configured vCenter servers.
+                                Sessions expire after 1 hour of inactivity.</p>
+                        </div>
+                    </div>
+
+                    <div class="login-right">
+                        <div class="form-group" style="height: 100%; display: flex; flex-direction: column;">
+                            <label style="margin-bottom: 0.75rem; display: block;">
+                                <i data-lucide="server"></i>
+                                Select vCenter Servers
+                            </label>
+                            <div class="vcenter-list-container">
+                                <div class="vcenter-list">
+                                    {% for vcenter in vcenters %}
+                                    <div class="vcenter-checkbox">
+                                        <input type="checkbox" id="vc_{{ vcenter.id }}" value="{{ vcenter.id }}"
+                                            checked>
+                                        <label for="vc_{{ vcenter.id }}">
+                                            <strong>{{ vcenter.name }}</strong>
+                                            <span class="vcenter-host">{{ vcenter.host }}</span>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <input type="hidden" name="selected_vcenters" id="selectedVcenters">
-
-                <button type="submit" class="btn-primary">
-                    <i data-lucide="log-in"></i>
-                    Sign In
-                </button>
             </form>
 
             <div id="loadingState" class="loading-container hidden">
@@ -76,12 +92,6 @@
                     <div class="loading-text">Connecting...</div>
                     <div class="loading-subtext">Establishing secure connection to vCenter environments</div>
                 </div>
-            </div>
-
-            <div class="login-info" id="loginInfo">
-                <i data-lucide="info"></i>
-                <p>Your credentials will be used to authenticate with all configured vCenter servers. Sessions expire
-                    after 1 hour of inactivity.</p>
             </div>
         </div>
     </div>
@@ -109,7 +119,7 @@
             document.getElementById('loginForm').classList.add('hidden');
             document.getElementById('loginInfo').classList.add('hidden');
             document.getElementById('loadingState').classList.remove('hidden');
-            
+
             // Allow form to submit naturally
         });
 

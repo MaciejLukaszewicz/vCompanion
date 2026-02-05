@@ -1,8 +1,8 @@
 import ssl
 import logging
-import asyncio
 import threading
 import time
+import concurrent.futures
 from datetime import datetime, timedelta
 from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
@@ -130,19 +130,31 @@ class VCenterManager:
 
     def get_all_recent_events(self, minutes=30):
         all_events = []
-        for vc_id, conn in self.connections.items():
-            if conn.is_alive():
-                events = conn.get_recent_events(minutes)
-                all_events.extend(events)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.connections)) as executor:
+            futures = {executor.submit(conn.get_recent_events, minutes): vc_id 
+                       for vc_id, conn in self.connections.items() if conn.is_alive()}
+            for future in concurrent.futures.as_completed(futures):
+                vc_id = futures[future]
+                try:
+                    events = future.result(timeout=30)
+                    all_events.extend(events)
+                except Exception as e:
+                    logger.error(f"Error fetching events from {vc_id}: {e}")
         all_events.sort(key=lambda x: x['time'], reverse=True)
         return all_events
 
     def get_all_recent_tasks(self, minutes=30):
         all_tasks = []
-        for vc_id, conn in self.connections.items():
-            if conn.is_alive():
-                tasks = conn.get_recent_tasks(minutes)
-                all_tasks.extend(tasks)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.connections)) as executor:
+            futures = {executor.submit(conn.get_recent_tasks, minutes): vc_id 
+                       for vc_id, conn in self.connections.items() if conn.is_alive()}
+            for future in concurrent.futures.as_completed(futures):
+                vc_id = futures[future]
+                try:
+                    tasks = future.result(timeout=30)
+                    all_tasks.extend(tasks)
+                except Exception as e:
+                    logger.error(f"Error fetching tasks from {vc_id}: {e}")
         all_tasks.sort(key=lambda x: x['start_time'] if x['start_time'] else "", reverse=True)
         return all_tasks
 
@@ -375,6 +387,8 @@ class VCenterConnection:
 
     def get_recent_events(self, minutes=30):
         if not self.content: return []
+        logger.info(f"[{self.config.name}] Fetching events for last {minutes}m...")
+        start_t = time.time()
         try:
             time_limit = datetime.now() - timedelta(minutes=minutes)
             filter_spec = vim.event.EventFilterSpec(time=vim.event.EventFilterSpec.ByTime(beginTime=time_limit))
@@ -388,11 +402,16 @@ class VCenterConnection:
                     "message": e.fullFormattedMessage, "user": e.userName or "System",
                     "time": e.createdTime.isoformat(), "severity": severity
                 })
+            logger.info(f"[{self.config.name}] Fetched {len(result)} events in {time.time()-start_t:.2f}s")
             return result
-        except: return []
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Error fetching events: {e}")
+            return []
 
     def get_recent_tasks(self, minutes=30):
         if not self.content: return []
+        logger.info(f"[{self.config.name}] Fetching tasks for last {minutes}m...")
+        start_t = time.time()
         try:
             time_limit = datetime.now() - timedelta(minutes=minutes)
             time_filter = vim.TaskFilterSpec.ByTime(beginTime=time_limit, timeType="startedTime")
@@ -416,43 +435,88 @@ class VCenterConnection:
                     "completion_time": t.completeTime.isoformat() if t.completeTime else None,
                     "status": status, "progress": progress, "error": t.error.localizedMessage if t.error else None
                 })
+            logger.info(f"[{self.config.name}] Fetched {len(result)} tasks in {time.time()-start_t:.2f}s")
             return result
-        except: return []
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Error fetching tasks: {e}")
+            return []
 
     def get_alerts_speed(self):
         if not self.content: return []
         try:
-            types = [vim.Datacenter, vim.ComputeResource, vim.ClusterComputeResource, vim.Folder, vim.HostSystem, vim.VirtualMachine]
-            view = self.content.viewManager.CreateContainerView(self.content.rootFolder, types, True)
+            # Optimized to catch ALL managed entities in one go
+            view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.ManagedEntity], True)
             spec = vim.PropertyFilterSpec(
                 propSet=[vim.PropertySpec(type=vim.ManagedEntity, pathSet=["name", "triggeredAlarmState"])],
-                objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
+                objectSet=[
+                    vim.ObjectSpec(obj=self.content.rootFolder, skip=False),
+                    vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])
+                ]
             )
             props = self.content.propertyCollector.RetrieveContents([spec])
             view.Destroy()
-            alerts = []
+
+            raw_alerts = []
+            alarm_mors = set()
             for obj in props:
                 name, triggered = "", []
                 for p in obj.propSet:
                     if p.name == "name": name = p.val
                     elif p.name == "triggeredAlarmState": triggered = p.val
+                
                 if not triggered: continue
+                
                 class_name = obj.obj.__class__.__name__
                 if class_name.startswith('vim.'): class_name = class_name[4:]
-                type_map = {"VirtualMachine": "VM", "HostSystem": "Host", "Folder": "Folder", "ClusterComputeResource": "Cluster", "ComputeResource": "Cluster", "Datacenter": "Datacenter"}
-                entity_type = type_map.get(class_name, class_name)
+                
                 for state in triggered:
-                    if state.overallStatus in ['yellow', 'red']:
-                        alarm_name = "Unknown Alarm"
-                        try:
-                            if state.alarm and hasattr(state.alarm, 'info'): alarm_name = state.alarm.info.name
-                            else: alarm_name = str(state.alarm).split(':')[-1].replace("'", "")
-                        except: pass
-                        alerts.append({
-                            "vcenter_id": self.config.id, "vcenter_name": self.config.name,
-                            "entity_name": name, "entity_type": entity_type, "alarm_name": alarm_name,
-                            "severity": "critical" if state.overallStatus == 'red' else "warning",
-                            "status": state.overallStatus, "time": state.time.isoformat() if state.time else datetime.now().isoformat()
+                    # Capture both critical (red) and warning (yellow)
+                    if state.overallStatus in ['yellow', 'red', 'gray']:
+                        # Sometimes health alarms show as gray but are still triggered
+                        alarm_mors.add(state.alarm)
+                        raw_alerts.append({
+                            "entity_name": name,
+                            "class_name": class_name,
+                            "alarm_mor": state.alarm,
+                            "status": state.overallStatus,
+                            "time": state.time.isoformat() if hasattr(state, 'time') and state.time else datetime.now().isoformat()
                         })
+
+            # Bulk fetch alarm names (MUCH faster than individual calls)
+            alarm_names = {}
+            if alarm_mors:
+                alarm_spec = vim.PropertyFilterSpec(
+                    propSet=[vim.PropertySpec(type=vim.Alarm, pathSet=["info.name"])],
+                    objectSet=[vim.ObjectSpec(obj=mor) for mor in alarm_mors]
+                )
+                try:
+                    alarm_props = self.content.propertyCollector.RetrieveContents([alarm_spec])
+                    for obj in alarm_props:
+                        for p in obj.propSet:
+                            if p.name == "info.name":
+                                alarm_names[obj.obj] = p.val
+                except: pass
+
+            type_map = {
+                "VirtualMachine": "VM", "HostSystem": "Host", "Folder": "Folder", 
+                "ClusterComputeResource": "Cluster", "ComputeResource": "Cluster", 
+                "Datacenter": "Datacenter", "Datastore": "Datastore", 
+                "ResourcePool": "Resource Pool", "DistributedVirtualSwitch": "DVS",
+                "DistributedVirtualPortgroup": "Portgroup", "Network": "Network"
+            }
+
+            alerts = []
+            for ra in raw_alerts:
+                entity_type = type_map.get(ra["class_name"], ra["class_name"])
+                severity = "critical" if ra["status"] == 'red' else "warning"
+                alerts.append({
+                    "vcenter_id": self.config.id, "vcenter_name": self.config.name,
+                    "entity_name": ra["entity_name"], "entity_type": entity_type, 
+                    "alarm_name": alarm_names.get(ra["alarm_mor"], f"Alarm:{ra['alarm_mor']._moId}"),
+                    "severity": severity,
+                    "status": ra["status"], "time": ra["time"]
+                })
             return alerts
-        except: return []
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Error in get_alerts_speed: {e}")
+            return []

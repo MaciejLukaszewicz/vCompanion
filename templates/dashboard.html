@@ -21,12 +21,30 @@
 <!-- Recent Tasks Table -->
 <section class="table-container" style="margin-top: 2rem;" id="tasks-table-section">
     <div onclick="toggleTasks()"
-        style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+        style="padding: 1.1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
         <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
             <i data-lucide="list-checks" size="18"></i> Recent Tasks (Last 30m)
         </h2>
-        <div id="tasks-toggle-icon" style="transition: transform 0.3s ease;">
-            <i data-lucide="chevron-down"></i>
+        <div style="display: flex; gap: 1.5rem; align-items: center;">
+            <div class="toggle-group" onclick="event.stopPropagation()">
+                <label class="toggle-item">
+                    <span>Autorefresh</span>
+                    <div class="switch">
+                        <input type="checkbox" id="tasks-autorefresh" onchange="handleTasksConfigChange()">
+                        <span class="slider"></span>
+                    </div>
+                </label>
+                <label class="toggle-item">
+                    <span>Active only</span>
+                    <div class="switch">
+                        <input type="checkbox" id="tasks-active-only" onchange="handleTasksConfigChange()">
+                        <span class="slider"></span>
+                    </div>
+                </label>
+            </div>
+            <div id="tasks-toggle-icon" style="transition: transform 0.3s ease;">
+                <i data-lucide="chevron-down"></i>
+            </div>
         </div>
     </div>
     <div id="tasks-table-content" style="display: none;" hx-get="/api/dashboard/tasks-table"
@@ -41,7 +59,7 @@
 <!-- Alerts Table -->
 <section class="table-container" style="margin-top: 1.5rem;" id="alerts-table-section">
     <div onclick="toggleAlerts()"
-        style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+        style="padding: 1.1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
         <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;"
             id="alerts-header">
             <i data-lucide="bell" size="18"></i> Triggered Infrastructure Alarms
@@ -77,12 +95,23 @@
 <!-- Recent Events Table -->
 <section class="table-container" style="margin-top: 1.5rem;" id="events-table-section">
     <div onclick="toggleEvents()"
-        style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+        style="padding: 1.1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
         <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
             <i data-lucide="activity" size="18"></i> Recent Events (Last 5m)
         </h2>
-        <div id="events-toggle-icon" style="transition: transform 0.3s ease;">
-            <i data-lucide="chevron-down"></i>
+        <div style="display: flex; gap: 1.5rem; align-items: center;">
+            <div class="toggle-group" onclick="event.stopPropagation()">
+                <label class="toggle-item">
+                    <span>Filter out logon and logoff events</span>
+                    <div class="switch">
+                        <input type="checkbox" id="events-filter-logon" checked onchange="handleEventsConfigChange()">
+                        <span class="slider"></span>
+                    </div>
+                </label>
+            </div>
+            <div id="events-toggle-icon" style="transition: transform 0.3s ease;">
+                <i data-lucide="chevron-down"></i>
+            </div>
         </div>
     </div>
     <div id="events-table-content" style="display: none;" hx-get="/api/dashboard/events-table"
@@ -104,6 +133,68 @@
         animation: spin 1s linear infinite;
         margin: 0 auto;
     }
+
+    /* Toggle Switches */
+    .toggle-group {
+        display: flex;
+        gap: 1.25rem;
+        align-items: center;
+    }
+
+    .toggle-item {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--text-dim);
+        cursor: pointer;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 28px;
+        height: 16px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--border);
+        transition: .3s;
+        border-radius: 16px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 10px;
+        width: 10px;
+        left: 3px;
+        bottom: 3px;
+        background-color: var(--text-main);
+        transition: .3s;
+        border-radius: 50%;
+    }
+
+    input:checked+.slider {
+        background-color: var(--primary);
+    }
+
+    input:checked+.slider:before {
+        transform: translateX(12px);
+    }
 </style>
 {% endblock %}
 
@@ -111,31 +202,73 @@
 <script>
     lucide.createIcons();
 
-    function toggleSection(contentId, iconId) {
-        const content = document.getElementById(contentId);
-        const icon = document.getElementById(iconId);
+    let tasksRefreshInterval = null;
 
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            icon.style.transform = 'rotate(180deg)';
+    function handleTasksConfigChange() {
+        const activeOnly = document.getElementById('tasks-active-only').checked;
+        const autorefresh = document.getElementById('tasks-autorefresh').checked;
+
+        const content = document.getElementById('tasks-table-content');
+        content.setAttribute('hx-get', `/api/dashboard/tasks-table?active_only=${activeOnly}`);
+        htmx.process(content);
+
+        if (content.style.display !== 'none') {
+            htmx.trigger(document.body, "load-tasks");
+        }
+
+        if (autorefresh && content.style.display !== 'none') {
+            startTasksAutorefresh();
         } else {
-            content.style.display = 'none';
-            icon.style.transform = 'rotate(0deg)';
+            stopTasksAutorefresh();
+        }
+    }
+
+    function startTasksAutorefresh() {
+        if (tasksRefreshInterval) return;
+        tasksRefreshInterval = setInterval(() => {
+            const content = document.getElementById('tasks-table-content');
+            if (content.style.display !== 'none') {
+                htmx.trigger(document.body, "load-tasks");
+            }
+        }, 10000);
+    }
+
+    function stopTasksAutorefresh() {
+        if (tasksRefreshInterval) {
+            clearInterval(tasksRefreshInterval);
+            tasksRefreshInterval = null;
+        }
+    }
+
+    function handleEventsConfigChange() {
+        const filterLogon = document.getElementById('events-filter-logon').checked;
+        const content = document.getElementById('events-table-content');
+        content.setAttribute('hx-get', `/api/dashboard/events-table?filter_logon=${filterLogon}`);
+        htmx.process(content);
+
+        if (content.style.display !== 'none') {
+            htmx.trigger(document.body, "load-events");
         }
     }
 
     function toggleTasks() {
         const content = document.getElementById('tasks-table-content');
         const icon = document.getElementById('tasks-toggle-icon');
+        const autorefresh = document.getElementById('tasks-autorefresh').checked;
+
         if (content.style.display === 'none') {
             content.style.display = 'block';
             icon.style.transform = 'rotate(180deg)';
             if (content.innerHTML.includes('spinner-small')) {
-                htmx.trigger("body", "load-tasks");
+                // First load
+                handleTasksConfigChange();
+            } else if (autorefresh) {
+                startTasksAutorefresh();
             }
         } else {
             content.style.display = 'none';
             icon.style.transform = 'rotate(0deg)';
+            stopTasksAutorefresh();
         }
     }
 
@@ -146,7 +279,7 @@
             content.style.display = 'block';
             icon.style.transform = 'rotate(180deg)';
             if (content.innerHTML.includes('spinner-small')) {
-                htmx.trigger("body", "load-events");
+                handleEventsConfigChange();
             }
         } else {
             content.style.display = 'none';
