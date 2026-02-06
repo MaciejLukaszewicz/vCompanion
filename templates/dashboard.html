@@ -71,8 +71,7 @@
             </span>
         </h2>
         <div style="display: flex; gap: 1rem; align-items: center;">
-            <div onclick="event.stopPropagation(); htmx.trigger('#alerts-table-content', 'load-alerts');"
-                title="Force refresh alarms"
+            <div onclick="event.stopPropagation(); htmx.trigger('body', 'load-alerts');" title="Force refresh alarms"
                 style="cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: background 0.2s;"
                 onmouseover="this.style.background='rgba(255,255,255,0.1)'"
                 onmouseout="this.style.background='transparent'">

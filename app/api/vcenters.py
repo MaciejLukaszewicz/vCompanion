@@ -34,6 +34,7 @@ async def get_status_bar(request: Request):
     )
     
     if any_recently_finished:
+        logger.info("Signal: vcenter-refreshed event triggered due to recent activity")
         response.headers["HX-Trigger"] = "vcenter-refreshed"
         
     return response

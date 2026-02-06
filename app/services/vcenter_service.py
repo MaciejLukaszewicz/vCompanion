@@ -80,6 +80,10 @@ class VCenterManager:
             # 2. Fetch VMs & Snapshots (detailed)
             vms = conn.get_vms_speed(hosts)
             self.cache.save_vms(vc_id, vms)
+
+            # 3. Fetch Alerts
+            alerts = conn.get_alerts_speed()
+            self.cache.save_alerts(vc_id, alerts)
             
             # 4. Fetch About info (version, build, etc.)
             about = conn.content.about
@@ -122,9 +126,20 @@ class VCenterManager:
         for vc_id, conn in self.connections.items():
             cs = self.cache.get_vcenter_status(vc_id) or {}
             last_t = self._last_refresh_trigger.get(vc_id, 0)
+            
+            # Calculate seconds since last refresh finished
+            seconds_since = None
+            if cs.get('last_refresh'):
+                try:
+                    lr_dt = datetime.fromisoformat(cs.get('last_refresh'))
+                    # Ensure timezone-aware comparison if needed, but local isoformat usually fine
+                    seconds_since = (datetime.now() - lr_dt).total_seconds()
+                except: pass
+
             status.append({
                 "id": vc_id, "name": conn.config.name, "host": conn.config.host,
                 "connected": conn.is_alive(), "refresh_status": cs.get('status', 'READY'),
+                "seconds_since": seconds_since,
                 "seconds_until": max(0, int((conn.config.refresh_interval or self.global_refresh_interval) - (now - last_t))) if last_t > 0 else 0,
                 "unlocked": self.cache.is_unlocked()
             })
@@ -451,16 +466,24 @@ class VCenterConnection:
         if not self.content: return []
         try:
             # Optimized to catch ALL managed entities in one go
+            # Reverting to ManagedEntity for maximum coverage and including rootFolder
             view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.ManagedEntity], True)
+            
             spec = vim.PropertyFilterSpec(
-                propSet=[vim.PropertySpec(type=vim.ManagedEntity, pathSet=["name", "triggeredAlarmState"])],
+                propSet=[
+                    vim.PropertySpec(type=vim.ManagedEntity, pathSet=["name", "triggeredAlarmState"])
+                ],
                 objectSet=[
                     vim.ObjectSpec(obj=self.content.rootFolder, skip=False),
-                    vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])
+                    vim.ObjectSpec(obj=view, skip=True, selectSet=[
+                        vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)
+                    ])
                 ]
             )
             props = self.content.propertyCollector.RetrieveContents([spec])
             view.Destroy()
+            
+            logger.info(f"[{self.config.name}] PropertyCollector returned {len(props) if props else 0} objects for alerts")
 
             raw_alerts = []
             alarm_mors = set()
@@ -471,14 +494,17 @@ class VCenterConnection:
                     elif p.name == "triggeredAlarmState": triggered = p.val
                 
                 if not triggered: continue
+                logger.debug(f"[{self.config.name}] Data for {name}: {len(triggered)} triggered states")
                 
                 class_name = obj.obj.__class__.__name__
                 if class_name.startswith('vim.'): class_name = class_name[4:]
                 
                 for state in triggered:
-                    # Capture both critical (red) and warning (yellow)
+                    # Log all states for debugging
+                    logger.debug(f"[{self.config.name}] Alarm status: {state.overallStatus} on {name}")
+                    
+                    # Capture critical (red), warning (yellow), and gray (often health/hardware)
                     if state.overallStatus in ['yellow', 'red', 'gray']:
-                        # Sometimes health alarms show as gray but are still triggered
                         alarm_mors.add(state.alarm)
                         raw_alerts.append({
                             "entity_name": name,
