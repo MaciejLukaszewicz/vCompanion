@@ -89,7 +89,11 @@ class VCenterManager:
             networks = conn.get_networks_speed()
             self.cache.save_networks(vc_id, networks)
 
-            # 5. Fetch About info (version, build, etc.)
+            # 5. Fetch Storage
+            storage = conn.get_storage_speed()
+            self.cache.save_storage(vc_id, storage)
+
+            # 6. Fetch About info (version, build, etc.)
             about = conn.content.about
             metadata = {
                 "version": about.version,
@@ -695,4 +699,96 @@ class VCenterConnection:
             }
         except Exception as e:
             logger.error(f"[{self.config.name}] Error fetching networks: {e}")
+            return {}
+    def get_storage_speed(self):
+        if not self.content: return {}
+        try:
+            # 1. Fetch Datastore Clusters (StoragePods)
+            ds_clusters = []
+            try:
+                view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.StoragePod], True)
+                props = self.content.propertyCollector.RetrieveContents([
+                    vim.PropertyFilterSpec(
+                        propSet=[vim.PropertySpec(type=vim.StoragePod, pathSet=["name", "childEntity", "summary"])],
+                        objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
+                    )
+                ])
+                view.Destroy()
+                for obj in props:
+                    p_dict = {p.name: p.val for p in obj.propSet}
+                    summary = p_dict.get("summary")
+                    ds_clusters.append({
+                        "mo_id": obj.obj._moId,
+                        "name": p_dict.get("name"),
+                        "capacity": summary.capacity if summary else 0,
+                        "free_space": summary.freeSpace if summary else 0,
+                        "datastores": [ds._moId for ds in p_dict.get("childEntity", []) if isinstance(ds, vim.Datastore)]
+                    })
+            except: pass
+
+            # 2. Fetch All Datastores
+            datastores = {}
+            try:
+                view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.Datastore], True)
+                props = self.content.propertyCollector.RetrieveContents([
+                    vim.PropertyFilterSpec(
+                        propSet=[vim.PropertySpec(type=vim.Datastore, pathSet=["name", "summary", "host", "info"])],
+                        objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
+                    )
+                ])
+                view.Destroy()
+                for obj in props:
+                    p_dict = {p.name: p.val for p in obj.propSet}
+                    summary = p_dict.get("summary")
+                    
+                    # Local vs Shared
+                    is_local = False
+                    if summary and hasattr(summary, 'datastore'):
+                        # Check host mounts
+                        mount_hosts = p_dict.get("host", [])
+                        if len(mount_hosts) == 1:
+                            is_local = True # Heuristic, often true for local
+                    
+                    # More reliable check if possible via info
+                    info = p_dict.get("info")
+                    if info:
+                        if isinstance(info, vim.VmfsDatastoreInfo):
+                            # VMFS often shared, check if local
+                            pass
+
+                    datastores[obj.obj._moId] = {
+                        "name": p_dict.get("name"),
+                        "capacity": summary.capacity if summary else 0,
+                        "free_space": summary.freeSpace if summary else 0,
+                        "type": summary.type if summary else "Unknown",
+                        "accessible": summary.accessible if summary else False,
+                        "hosts": [h.key._moId for h in p_dict.get("host", []) if hasattr(h, 'key')],
+                        "is_local": is_local
+                    }
+            except: pass
+
+            # 3. Fetch Hosts to get names for MOID mapping
+            host_map = {}
+            try:
+                view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.HostSystem], True)
+                props = self.content.propertyCollector.RetrieveContents([
+                    vim.PropertyFilterSpec(
+                        propSet=[vim.PropertySpec(type=vim.HostSystem, pathSet=["name"])],
+                        objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
+                    )
+                ])
+                view.Destroy()
+                for obj in props:
+                    p_dict = {p.name: p.val for p in obj.propSet}
+                    host_map[obj.obj._moId] = p_dict.get("name")
+            except: pass
+
+            return {
+                "vcenter_id": self.config.id,
+                "clusters": ds_clusters,
+                "datastores": datastores,
+                "host_names": host_map
+            }
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Error fetching storage: {e}")
             return {}

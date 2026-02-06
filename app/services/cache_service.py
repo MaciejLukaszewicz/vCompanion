@@ -39,7 +39,7 @@ class CacheService:
         project_root = Path(__file__).parent.parent.parent
         self.data_dir = project_root / "data"
         self.data_dir.mkdir(exist_ok=True)
-        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}}
+        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}, "storage": {}}
         self.salt_path = self.data_dir / "salt.bin"
         if not self.salt_path.exists():
             self.salt = os.urandom(16)
@@ -128,6 +128,11 @@ class CacheService:
         self._data["networks"][vcenter_id] = networks
         self._save_to_disk()
 
+    def save_storage(self, vcenter_id: str, storage: dict):
+        if not self._is_unlocked: return
+        self._data["storage"][vcenter_id] = storage
+        self._save_to_disk()
+
     def get_all_vms(self):
         all_vms = []
         for vms in self._data["vms"].values(): all_vms.extend(vms)
@@ -145,6 +150,9 @@ class CacheService:
 
     def get_all_networks(self):
         return self._data["networks"]
+
+    def get_all_storage(self):
+        return self._data.get("storage", {})
 
     def get_cached_stats(self):
         vms = self.get_all_vms()

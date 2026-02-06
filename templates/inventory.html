@@ -126,6 +126,72 @@
         </div>
     </section>
 
+    <!-- Hosts Section -->
+    <section class="table-container" id="hosts-section" style="margin-bottom: 1rem;">
+        <div onclick="toggleInventorySection('hosts-content', 'hosts-toggle-icon')"
+            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02);">
+            <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem;">
+                <i data-lucide="server" size="18" style="color: var(--warning);"></i> ESXi Hosts
+            </h2>
+            <div id="hosts-toggle-icon" style="transition: transform 0.3s ease;">
+                <i data-lucide="chevron-down"></i>
+            </div>
+        </div>
+        <div id="hosts-content" style="display: none; height: 500px;">
+            <!-- Left Side: Host List -->
+            <div class="inventory-list-pane" style="flex: 1; border-right: 1px solid var(--border); overflow-y: auto;"
+                hx-get="/api/inventory/hosts" hx-trigger="load" hx-target="#host-list-target">
+                <div id="host-list-target">
+                    <div style="padding: 2rem; text-align: center; color: var(--text-dim);">Loading hosts...</div>
+                </div>
+            </div>
+
+            <!-- Right Side: Host Details -->
+            <div class="inventory-details-pane" id="host-details-panel"
+                style="flex: 1.2; background: rgba(0,0,0,0.1); overflow-y: auto;">
+                <div
+                    style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); padding: 2rem; text-align: center;">
+                    <i data-lucide="server" size="48" style="margin-bottom: 1rem; opacity: 0.2;"></i>
+                    <p>Select an ESXi host to view hardware, version, and performance details.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Storage Section -->
+    <section class="table-container" id="storage-section" style="margin-bottom: 2rem;">
+        <div
+            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+            <div style="display: flex; align-items: center; gap: 2rem; flex: 1;">
+                <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;"
+                    onclick="toggleInventorySection('storage-content', 'storage-toggle-icon')">
+                    <i data-lucide="database" size="18" style="color: var(--accent);"></i> Storage
+                </h2>
+
+                <!-- Storage Search Bar -->
+                <div style="position: relative; width: 300px;">
+                    <i data-lucide="search" size="14"
+                        style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-dim);"></i>
+                    <input type="text" id="storage-search" placeholder="Filter by name or host..."
+                        onkeyup="if(typeof filterStorage === 'function') filterStorage(this.value)"
+                        style="width: 100%; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 1rem 0.4rem 2.25rem; font-size: 0.85rem; color: var(--text-main);">
+                </div>
+            </div>
+
+            <div id="storage-toggle-icon" style="transition: transform 0.3s ease; cursor: pointer;"
+                onclick="toggleInventorySection('storage-content', 'storage-toggle-icon')">
+                <i data-lucide="chevron-down"></i>
+            </div>
+        </div>
+        <div id="storage-content" style="display: none; padding: 1.5rem; max-height: 800px; overflow-y: auto;"
+            hx-get="/api/inventory/storage" hx-trigger="load">
+            <div style="padding: 2rem; text-align: center; color: var(--text-dim);">
+                <div class="spinner-small" style="margin-bottom: 1rem;"></div>
+                Loading storage topology...
+            </div>
+        </div>
+    </section>
+
     <!-- Networking Topology Section -->
     <section class="table-container" id="networking-section" style="margin-bottom: 2rem;">
         <div
@@ -161,37 +227,6 @@
         </div>
     </section>
 
-    <!-- Hosts Section -->
-    <section class="table-container" id="hosts-section" style="margin-bottom: 1rem;">
-        <div onclick="toggleInventorySection('hosts-content', 'hosts-toggle-icon')"
-            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02);">
-            <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem;">
-                <i data-lucide="server" size="18" style="color: var(--warning);"></i> ESXi Hosts
-            </h2>
-            <div id="hosts-toggle-icon" style="transition: transform 0.3s ease;">
-                <i data-lucide="chevron-down"></i>
-            </div>
-        </div>
-        <div id="hosts-content" style="display: none; height: 500px;">
-            <!-- Left Side: Host List -->
-            <div class="inventory-list-pane" style="flex: 1; border-right: 1px solid var(--border); overflow-y: auto;"
-                hx-get="/api/inventory/hosts" hx-trigger="load" hx-target="#host-list-target">
-                <div id="host-list-target">
-                    <div style="padding: 2rem; text-align: center; color: var(--text-dim);">Loading hosts...</div>
-                </div>
-            </div>
-
-            <!-- Right Side: Host Details -->
-            <div class="inventory-details-pane" id="host-details-panel"
-                style="flex: 1.2; background: rgba(0,0,0,0.1); overflow-y: auto;">
-                <div
-                    style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); padding: 2rem; text-align: center;">
-                    <i data-lucide="server" size="48" style="margin-bottom: 1rem; opacity: 0.2;"></i>
-                    <p>Select an ESXi host to view hardware, version, and performance details.</p>
-                </div>
-            </div>
-        </div>
-    </section>
 
     <!-- vCenter Management Section -->
     <section class="table-container" id="vcenters-section" style="margin-bottom: 2rem;">

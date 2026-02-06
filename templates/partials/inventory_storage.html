@@ -1,0 +1,370 @@
+{% macro format_size(bytes) -%}
+{% if bytes > 1099511627776 %}
+{{ (bytes / 1099511627776) | round(2) }} TB
+{% elif bytes > 1073741824 %}
+{{ (bytes / 1073741824) | round(2) }} GB
+{% else %}
+{{ (bytes / 1048576) | round(2) }} MB
+{% endif %}
+{%- endmacro %}
+
+<div class="storage-topology-container">
+    {% for vc in vcenters %}
+    <div class="tree-root-container">
+        <div class="tree-header">
+            <i data-lucide="shield" style="color: var(--primary); width: 18px; height: 18px;"></i>
+            <span class="vcenter-title">{{ vc.name }}</span>
+        </div>
+
+        <div class="tree-body">
+            <!-- Datastore Clusters -->
+            {% for cluster in vc.clusters %}
+            <div class="tree-branch cluster-branch">
+                <div class="branch-header">
+                    <i data-lucide="box" style="color: var(--accent); width: 16px; height: 16px;"></i>
+                    <span class="branch-title">{{ cluster.name }}</span>
+                    <span class="badge badge-cluster">Datastore Cluster</span>
+
+                    <div class="header-usage">
+                        {% set used = cluster.capacity - cluster.free_space %}
+                        {% set usage_pct = (used / cluster.capacity * 100) | round(1) if cluster.capacity > 0 else 0 %}
+                        <div class="usage-text">
+                            <span>{{ format_size(used) }} / {{ format_size(cluster.capacity) }}</span>
+                            <span
+                                class="usage-pct {% if usage_pct > 90 %}critical{% elif usage_pct > 80 %}warning{% endif %}">{{
+                                usage_pct }}%</span>
+                        </div>
+                        <div class="mini-progress-bar">
+                            <div class="progress-fill {% if usage_pct > 90 %}bg-critical{% elif usage_pct > 80 %}bg-warning{% else %}bg-primary{% endif %}"
+                                style="width: {{ usage_pct }}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="branch-content">
+                    {% for ds in cluster.datastores %}
+                    <div class="tree-item datastore-item" data-name="{{ ds.name }}"
+                        data-hosts="{{ ds.hosts | join(',') }}">
+                        <div class="item-header">
+                            <i data-lucide="database" style="color: var(--text-dim); width: 14px; height: 14px;"></i>
+                            <span class="ds-name">{{ ds.name }}</span>
+                            <span class="badge">{{ ds.type }}</span>
+                            {% if ds.is_local %}<span class="badge badge-local">Local</span>{% else %}<span
+                                class="badge badge-shared">Shared</span>{% endif %}
+
+                            <div class="item-usage">
+                                {% set ds_used = ds.capacity - ds.free_space %}
+                                {% set ds_pct = (ds_used / ds.capacity * 100) | round(1) if ds.capacity > 0 else 0 %}
+                                <div class="usage-bar-container">
+                                    <div class="usage-bar-fill {% if ds_pct > 90 %}bg-critical{% elif ds_pct > 80 %}bg-warning{% else %}bg-primary{% endif %}"
+                                        style="width: {{ ds_pct }}%"></div>
+                                </div>
+                                <span class="usage-label">{{ format_size(ds_used) }} / {{ format_size(ds.capacity) }}
+                                    ({{ ds_pct }}%)</span>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="host-list">
+                                <span class="detail-label">Visible by:</span>
+                                <div class="host-tags">
+                                    {% for host in ds.hosts %}
+                                    <span class="host-tag"><i data-lucide="server" size="10"></i> {{ host }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Standalone Datastores -->
+            {% for ds in vc.standalone_datastores %}
+            <div class="tree-branch standalone-branch datastore-item" data-name="{{ ds.name }}"
+                data-hosts="{{ ds.hosts | join(',') }}">
+                <div class="branch-header" style="background: transparent; border: 1px solid var(--border);">
+                    <i data-lucide="database" style="color: var(--text-dim); width: 16px; height: 16px;"></i>
+                    <span class="branch-title ds-name">{{ ds.name }}</span>
+                    <span class="badge">{{ ds.type }}</span>
+                    {% if ds.is_local %}<span class="badge badge-local">Local</span>{% else %}<span
+                        class="badge badge-shared">Shared</span>{% endif %}
+
+                    <div class="header-usage">
+                        {% set used = ds.capacity - ds.free_space %}
+                        {% set usage_pct = (used / ds.capacity * 100) | round(1) if ds.capacity > 0 else 0 %}
+                        <div class="usage-text">
+                            <span>{{ format_size(used) }} / {{ format_size(ds.capacity) }}</span>
+                            <span
+                                class="usage-pct {% if usage_pct > 90 %}critical{% elif usage_pct > 80 %}warning{% endif %}">{{
+                                usage_pct }}%</span>
+                        </div>
+                        <div class="mini-progress-bar">
+                            <div class="progress-fill {% if usage_pct > 90 %}bg-critical{% elif usage_pct > 80 %}bg-warning{% else %}bg-primary{% endif %}"
+                                style="width: {{ usage_pct }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="branch-content" style="border-left-style: dashed;">
+                    <div class="item-details" style="padding: 0;">
+                        <div class="host-list">
+                            <span class="detail-label">Visible by:</span>
+                            <div class="host-tags">
+                                {% for host in ds.hosts %}
+                                <span class="host-tag"><i data-lucide="server" size="10"></i> {{ host }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+    .storage-topology-container {
+        font-size: 0.875rem;
+    }
+
+    .tree-root-container {
+        margin-bottom: 3rem;
+    }
+
+    .tree-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 1.5rem;
+    }
+
+    .vcenter-title {
+        font-weight: 700;
+        font-size: 1.125rem;
+        color: var(--text-main);
+    }
+
+    .tree-branch {
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+
+    .branch-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem 1.25rem;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        font-weight: 600;
+    }
+
+    .branch-title {
+        color: var(--text-main);
+    }
+
+    .branch-content {
+        padding-left: 2rem;
+        border-left: 1px solid var(--border);
+        margin-left: 1.5rem;
+        padding-top: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .header-usage {
+        margin-left: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 250px;
+    }
+
+    .usage-text {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        font-family: monospace;
+        color: var(--text-dim);
+    }
+
+    .usage-pct {
+        font-weight: 700;
+        color: var(--success);
+    }
+
+    .usage-pct.warning {
+        color: var(--warning);
+    }
+
+    .usage-pct.critical {
+        color: var(--danger);
+    }
+
+    .mini-progress-bar {
+        height: 4px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 2px;
+        overflow: hidden;
+        width: 100%;
+    }
+
+    .progress-fill {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+
+    .bg-primary {
+        background: var(--primary);
+    }
+
+    .bg-warning {
+        background: var(--warning);
+    }
+
+    .bg-critical {
+        background: var(--danger);
+    }
+
+    .tree-item {
+        padding: 0.5rem 0;
+    }
+
+    .item-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: nowrap;
+    }
+
+    .ds-name {
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    .item-usage {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        min-width: 320px;
+    }
+
+    .usage-bar-container {
+        flex: 1;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .usage-bar-fill {
+        height: 100%;
+    }
+
+    .usage-label {
+        font-size: 0.75rem;
+        font-family: monospace;
+        color: var(--text-dim);
+        min-width: 180px;
+        text-align: right;
+    }
+
+    .item-details {
+        padding-left: 1.75rem;
+        margin-top: 0.25rem;
+    }
+
+    .host-list {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .detail-label {
+        font-size: 0.7rem;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .host-tags {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .host-tag {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 2px 8px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid var(--border);
+    }
+
+    .badge {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+
+    .badge-cluster {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+    .badge-local {
+        border-color: #94a3b8;
+        color: #94a3b8;
+    }
+
+    .badge-shared {
+        border-color: var(--primary);
+        color: var(--primary);
+        opacity: 0.8;
+    }
+</style>
+
+<script>
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    function filterStorage(query) {
+        query = query.trim().toLowerCase();
+        const items = document.querySelectorAll('.datastore-item');
+        const rootBranches = document.querySelectorAll('.tree-branch');
+
+        if (!query) {
+            items.forEach(i => i.style.display = 'block');
+            rootBranches.forEach(b => b.style.display = 'block');
+            return;
+        }
+
+        items.forEach(item => {
+            const name = item.getAttribute('data-name').toLowerCase();
+            const hosts = item.getAttribute('data-hosts').toLowerCase();
+            item.style.display = (name.includes(query) || hosts.includes(query)) ? 'block' : 'none';
+        });
+
+        // Hide clusters if no visible datastores inside
+        document.querySelectorAll('.cluster-branch').forEach(cluster => {
+            const hasVisibleDS = Array.from(cluster.querySelectorAll('.datastore-item')).some(ds => ds.style.display !== 'none');
+            cluster.style.display = hasVisibleDS ? 'block' : 'none';
+        });
+
+        // HideStandalone branches if they don't match (already handled by datastore-item class)
+    }
+</script>

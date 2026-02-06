@@ -410,3 +410,86 @@ async def get_networks_partial(request: Request):
         "request": request,
         "vcenters": vcenter_data
     })
+
+@router.get("/storage")
+async def get_storage_partial(request: Request):
+    """Returns the storage topology partial."""
+    require_auth(request)
+
+    if not hasattr(request.app.state, 'vcenter_manager'):
+        return HTMLResponse("<p>Manager not ready</p>")
+
+    cache = request.app.state.vcenter_manager.cache
+    all_storage = cache.get_all_storage()
+    
+    vcenter_data = []
+
+    for vc_id, storage_data in all_storage.items():
+        vcenter_status = cache.get_vcenter_status(vc_id)
+        vc_name = vcenter_status.get('name', vc_id) if vcenter_status else vc_id
+        
+        vc_structure = {
+            "name": vc_name,
+            "id": vc_id,
+            "clusters": [],
+            "standalone_datastores": []
+        }
+
+        # MOID to Name mapping for hosts
+        host_names = storage_data.get('host_names', {})
+        ds_map = storage_data.get('datastores', {})
+        
+        # Track which datastores are in clusters
+        ds_in_clusters = set()
+
+        # 1. Process Datastore Clusters
+        for cluster in storage_data.get('clusters', []):
+            cl_item = {
+                "name": cluster['name'],
+                "mo_id": cluster['mo_id'],
+                "capacity": cluster['capacity'],
+                "free_space": cluster['free_space'],
+                "datastores": []
+            }
+            
+            for ds_id in cluster.get('datastores', []):
+                ds = ds_map.get(ds_id)
+                if ds:
+                    ds_in_clusters.add(ds_id)
+                    cl_item['datastores'].append({
+                        "name": ds['name'],
+                        "mo_id": ds_id,
+                        "capacity": ds['capacity'],
+                        "free_space": ds['free_space'],
+                        "type": ds['type'],
+                        "is_local": ds['is_local'],
+                        "hosts": sorted([host_names.get(h_id, h_id) for h_id in ds.get('hosts', [])])
+                    })
+            
+            cl_item['datastores'].sort(key=lambda x: x['name'].lower())
+            vc_structure['clusters'].append(cl_item)
+
+        # 2. Process Standalone Datastores
+        for ds_id, ds in ds_map.items():
+            if ds_id not in ds_in_clusters:
+                vc_structure['standalone_datastores'].append({
+                    "name": ds['name'],
+                    "mo_id": ds_id,
+                    "capacity": ds['capacity'],
+                    "free_space": ds['free_space'],
+                    "type": ds['type'],
+                    "is_local": ds['is_local'],
+                    "hosts": sorted([host_names.get(h_id, h_id) for h_id in ds.get('hosts', [])])
+                })
+
+        vc_structure['clusters'].sort(key=lambda x: x['name'].lower())
+        vc_structure['standalone_datastores'].sort(key=lambda x: x['name'].lower())
+        vcenter_data.append(vc_structure)
+
+    vcenter_data.sort(key=lambda x: x['name'].lower())
+
+    from main import templates
+    return templates.TemplateResponse("partials/inventory_storage.html", {
+        "request": request,
+        "vcenters": vcenter_data
+    })
