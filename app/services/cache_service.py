@@ -8,14 +8,38 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+# Try to import pyVmomi for type checking
+try:
+    from pyVmomi import vim
+except ImportError:
+    vim = None
+
 logger = logging.getLogger(__name__)
+
+class VMwareJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle VMware-specific objects like vim.NumericRange."""
+    def default(self, obj):
+        # pyVmomi objects
+        if vim and hasattr(obj, '__module__') and obj.__module__.startswith('pyVmomi'):
+            if isinstance(obj, vim.NumericRange):
+                if obj.start == obj.end: return str(obj.start)
+                return f"{obj.start}-{obj.end}"
+            return str(obj)
+        # Standard datetime
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        # Fallback to string for unknown objects instead of failing
+        try:
+            return super().default(obj)
+        except TypeError:
+            return str(obj)
 
 class CacheService:
     def __init__(self):
         project_root = Path(__file__).parent.parent.parent
         self.data_dir = project_root / "data"
         self.data_dir.mkdir(exist_ok=True)
-        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}}
+        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}}
         self.salt_path = self.data_dir / "salt.bin"
         if not self.salt_path.exists():
             self.salt = os.urandom(16)
@@ -39,7 +63,7 @@ class CacheService:
     def lock(self):
         self._fernet = None
         self._is_unlocked = False
-        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}}
+        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}}
 
     def _get_file_path(self, type_name: str) -> Path: return self.data_dir / f"{type_name}.enc"
 
@@ -47,10 +71,12 @@ class CacheService:
         if not self._is_unlocked: return
         for key in self._data:
             try:
-                content = json.dumps(self._data[key]).encode()
+                # Use custom encoder to handle vim.NumericRange and other complex types
+                content = json.dumps(self._data[key], cls=VMwareJSONEncoder).encode()
                 encrypted = self._fernet.encrypt(content)
                 self._get_file_path(key).write_bytes(encrypted)
-            except Exception as e: logger.error(f"Error saving {key}: {e}")
+            except Exception as e: 
+                logger.error(f"Error saving {key}: {e}")
 
     def _load_from_disk(self):
         if not self._is_unlocked: return
@@ -97,6 +123,11 @@ class CacheService:
         self._data["alerts"][vcenter_id] = alerts
         self._save_to_disk()
 
+    def save_networks(self, vcenter_id: str, networks: dict):
+        if not self._is_unlocked: return
+        self._data["networks"][vcenter_id] = networks
+        self._save_to_disk()
+
     def get_all_vms(self):
         all_vms = []
         for vms in self._data["vms"].values(): all_vms.extend(vms)
@@ -111,6 +142,9 @@ class CacheService:
         all_alerts = []
         for alerts in self._data["alerts"].values(): all_alerts.extend(alerts)
         return all_alerts
+
+    def get_all_networks(self):
+        return self._data["networks"]
 
     def get_cached_stats(self):
         vms = self.get_all_vms()

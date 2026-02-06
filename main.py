@@ -80,7 +80,7 @@ def get_vcenter_status(request: Request):
         "refresh_status": "READY", "unlocked": False
     } for vc in settings.vcenters]
 
-@app.get("/login")
+@app.api_route("/login", methods=["GET", "HEAD"])
 async def login_page(request: Request):
     """Display login page."""
     if is_authenticated(request):

@@ -261,3 +261,152 @@ async def get_vcenters_partial(request: Request):
         "request": request,
         "vcenters": vcenter_statuses
     })
+
+@router.get("/networks")
+async def get_networks_partial(request: Request):
+    """Returns the Networking view (Switches & Physical)."""
+    require_auth(request)
+    if not hasattr(request.app.state, 'vcenter_manager'):
+        return HTMLResponse("<p>Manager not ready</p>")
+
+    cache = request.app.state.vcenter_manager.cache
+    all_networks = cache.get_all_networks()
+    all_vms = cache.get_all_vms()
+    all_hosts = cache.get_all_hosts()
+
+    # Pre-map VMs for faster lookup: { (vc_id, mo_id): {name, networks: []} }
+    vm_map = {}
+    for vm in all_vms:
+        vm_map[(vm.get('vcenter_id'), vm.get('id'))] = {
+            "name": vm.get('name'),
+            "networks": vm.get('networks', [])
+        }
+
+    vcenter_data = []
+
+    for vc_id, net_data in all_networks.items():
+        vcenter_status = cache.get_vcenter_status(vc_id)
+        vc_name = vcenter_status.get('name', vc_id) if vcenter_status else vc_id
+        
+        vc_structure = {
+            "name": vc_name,
+            "id": vc_id,
+            "hosts": [],
+            "distributed_switches": []
+        }
+
+        # 1. Process Distributed Switches
+        dvs_list = net_data.get('distributed_switches', [])
+        dvpg_map = net_data.get('distributed_portgroups', {})
+
+        for dvs in dvs_list:
+            dvs_item = {
+                "name": dvs['name'],
+                "mo_id": dvs['mo_id'],
+                "portgroups": [],
+                "uplinks": [] # Global uplinks from all hosts
+            }
+            
+            # Find which host pnics are connected to this DVS
+            # We match by DVS name (simplest)
+            for host in net_data.get('hosts', []):
+                for sw in host.get('switches', []):
+                    if sw['type'] == 'distributed' and sw['name'] == dvs['name']:
+                        for up in sw.get('uplinks', []):
+                            dvs_item['uplinks'].append(f"{host['name']}:{up}")
+
+            dvs_item['uplinks'] = sorted(list(set(dvs_item['uplinks'])))
+
+            # Find portgroups belonging to THIS DVS
+            for pg_id in dvs.get('portgroups', []):
+                pg = dvpg_map.get(pg_id)
+                if pg:
+                    # VMs connected to this DVPG
+                    connected_vms = []
+                    for vm_id in pg.get('vms', []):
+                        vm_info = vm_map.get((vc_id, vm_id))
+                        if vm_info:
+                            connected_vms.append(vm_info['name'])
+                    
+                    # VMkernels connected to this DVPG (check by mo_id match in dvs_port)
+                    connected_vmkernels = []
+                    for host in net_data.get('hosts', []):
+                        for vmk in host.get('vmkernels', []):
+                            if vmk.get('dvs_port') == pg_id:
+                                connected_vmkernels.append(f"{host['name']}:{vmk['device']} ({vmk['ip']})")
+
+                    dvs_item['portgroups'].append({
+                        "name": pg['name'],
+                        "vlan": pg['vlan'],
+                        "vms": sorted(list(set(connected_vms))),
+                        "vmkernels": sorted(connected_vmkernels),
+                        "is_uplink": pg.get('is_uplink', False)
+                    })
+            
+            dvs_item['portgroups'].sort(key=lambda x: x['name'].lower())
+            vc_structure['distributed_switches'].append(dvs_item)
+
+        # 2. Process Hosts (Standard Switches)
+        for host in net_data.get('hosts', []):
+            h_item = {
+                "name": host['name'],
+                "mo_id": host['mo_id'],
+                "switches": [],
+                "physical_uplinks": []
+            }
+
+            for sw in host.get('switches', []):
+                if sw['type'] == 'standard':
+                    sw_item = {
+                        "name": sw['name'],
+                        "uplinks": sw.get('uplinks', []),
+                        "portgroups": []
+                    }
+                    # Portgroups for this VSS
+                    for pg in host.get('portgroups', []):
+                        if pg['vswitch'] == sw['name']:
+                            # VMs on this host connected to this specific PG
+                            pg_vms = []
+                            for (vid, vmid), v_info in vm_map.items():
+                                if vid == vc_id:
+                                    # Since standard PGs are local to host, we must check if VM is on this host
+                                    # Actually we need VM host info here too
+                                    pass # Optimization: rely on vm.networks matching pg name for VMs on this host
+                            
+                            # Searching all VMs on this host
+                            host_vms = [v for v in all_vms if v.get('vcenter_id') == vc_id and v.get('host') == host['name']]
+                            pg_vms = [v['name'] for v in host_vms if pg['name'] in v.get('networks', [])]
+
+                            pg_vmks = [f"{vmk['device']} ({vmk['ip']})" for vmk in host.get('vmkernels', []) if vmk['portgroup'] == pg['name']]
+
+                            sw_item['portgroups'].append({
+                                "name": pg['name'],
+                                "vlan": pg['vlan'],
+                                "vms": sorted(list(set(pg_vms))),
+                                "vmkernels": sorted(pg_vmks)
+                            })
+                    
+                    sw_item['portgroups'].sort(key=lambda x: x['name'].lower())
+                    h_item['switches'].append(sw_item)
+                
+                # Physical Uplinks (Standard + Distributed)
+                for up in sw.get('uplinks', []):
+                    h_item['physical_uplinks'].append({
+                        "device": up,
+                        "switch": sw['name']
+                    })
+
+            vc_structure['hosts'].append(h_item)
+
+        # Sort hosts by name
+        vc_structure['hosts'].sort(key=lambda x: x['name'].lower())
+        vcenter_data.append(vc_structure)
+
+    # Sort vcenters by name
+    vcenter_data.sort(key=lambda x: x['name'].lower())
+
+    from main import templates
+    return templates.TemplateResponse("partials/inventory_networks.html", {
+        "request": request,
+        "vcenters": vcenter_data
+    })

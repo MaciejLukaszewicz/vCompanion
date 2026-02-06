@@ -581,6 +581,51 @@ tr:last-child td {
     padding-right: 0.5rem;
 }
 
+.server-unavailable-state {
+    background: rgba(220, 38, 38, 0.05);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    border-radius: 1rem;
+    padding: 2.5rem;
+    text-align: center;
+    margin-top: 1rem;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.server-unavailable-state i {
+    color: var(--danger);
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    opacity: 0.8;
+}
+
+.server-unavailable-state h2 {
+    color: var(--text-main);
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.server-unavailable-state p {
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-bottom: 0;
+}
+
+.connection-lost-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+}
+
 .vcenter-list-container::-webkit-scrollbar {
     width: 6px;
 }
@@ -1128,6 +1173,15 @@ tr:last-child td {
     border-radius: 50%;
     animation: spin 1s linear infinite;
     filter: drop-shadow(0 0 10px var(--primary-glow));
+}
+
+.spinner-small {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border);
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
 
 .loading-text {

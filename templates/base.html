@@ -145,17 +145,23 @@
     </div>
 
     <!-- Connection Lost Overlay -->
-    <div id="connection-lost-overlay"
-        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 10000; flex-direction: column; align-items: center; justify-content: center; gap: 2rem;">
-        <div class="spinner" style="width: 80px; height: 80px;"></div>
-        <div style="text-align: center;">
-            <h2 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--text-main);">Connection Lost</h2>
-            <p style="color: var(--text-dim); font-size: 1.125rem;">The vCompanion server is unreachable. Attempting to
-                reconnect...</p>
+    <div id="connection-lost-overlay" class="connection-lost-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 500px; width: 90%; text-align: center;">
+            <div class="server-unavailable-state" style="margin-top: 0; border: none; background: transparent;">
+                <i data-lucide="cloud-off" style="width: 64px; height: 64px;"></i>
+                <h2 style="font-size: 2rem;">Connection Lost</h2>
+                <p style="font-size: 1.125rem;">The vCompanion server is currently unreachable.<br>Attempting to
+                    reconnect automatically...</p>
+                <div class="spinner-small"
+                    style="margin-top: 2rem; width: 30px; height: 30px; border-width: 3px; margin-left: auto; margin-right: auto;">
+                </div>
+
+                <button onclick="window.location.reload()" class="btn-primary"
+                    style="margin-top: 2rem; width: auto; padding: 0.75rem 2rem; margin-left: auto; margin-right: auto;">
+                    <i data-lucide="refresh-cw"></i> Retry Now
+                </button>
+            </div>
         </div>
-        <button onclick="window.location.reload()" class="btn-primary" style="margin-top: 1rem;">
-            <i data-lucide="refresh-cw"></i> Retry Now
-        </button>
     </div>
 
     <script>

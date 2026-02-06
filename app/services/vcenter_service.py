@@ -84,8 +84,12 @@ class VCenterManager:
             # 3. Fetch Alerts
             alerts = conn.get_alerts_speed()
             self.cache.save_alerts(vc_id, alerts)
-            
-            # 4. Fetch About info (version, build, etc.)
+
+            # 4. Fetch Networks
+            networks = conn.get_networks_speed()
+            self.cache.save_networks(vc_id, networks)
+
+            # 5. Fetch About info (version, build, etc.)
             about = conn.content.about
             metadata = {
                 "version": about.version,
@@ -552,3 +556,143 @@ class VCenterConnection:
         except Exception as e:
             logger.error(f"[{self.config.name}] Error in get_alerts_speed: {e}")
             return []
+
+    def get_networks_speed(self):
+        if not self.content: return {}
+        try:
+            # 1. Fetch DVS
+            dvs_data = []
+            try:
+                view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.DistributedVirtualSwitch], True)
+                props = self.content.propertyCollector.RetrieveContents([
+                    vim.PropertyFilterSpec(
+                        propSet=[vim.PropertySpec(type=vim.DistributedVirtualSwitch, pathSet=["name", "portgroup"])],
+                        objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
+                    )
+                ])
+                view.Destroy()
+                for obj in props:
+                    p_dict = {p.name: p.val for p in obj.propSet}
+                    dvs_data.append({
+                        "mo_id": obj.obj._moId,
+                        "name": p_dict.get("name"),
+                        "portgroups": [pg._moId for pg in p_dict.get("portgroup", [])]
+                    })
+            except: pass
+
+            # 2. Fetch DVPortgroups (Broad approach)
+            dvpg_data = {}
+            try:
+                view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.DistributedVirtualPortgroup], True)
+                props = self.content.propertyCollector.RetrieveContents([
+                    vim.PropertyFilterSpec(
+                        propSet=[vim.PropertySpec(type=vim.DistributedVirtualPortgroup, pathSet=["name", "config", "vm"])],
+                        objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
+                    )
+                ])
+                view.Destroy()
+                for obj in props:
+                    p_dict = {p.name: p.val for p in obj.propSet}
+                    config = p_dict.get("config")
+                    
+                    vlan_val = 0
+                    is_uplink = False
+                    if config:
+                        is_uplink = getattr(config, 'uplink', False)
+                        # Try to get VLAN from defaultPortConfig
+                        try:
+                            vlan_config = config.defaultPortConfig.vlan
+                            if hasattr(vlan_config, 'vlanId'):
+                                vlan_val = vlan_config.vlanId
+                            elif hasattr(vlan_config, 'vlan'): # Range/Trunk (list of NumericRange)
+                                try:
+                                    ranges = []
+                                    for r in vlan_config.vlan:
+                                        if r.start == r.end: ranges.append(str(r.start))
+                                        else: ranges.append(f"{r.start}-{r.end}")
+                                    vlan_val = ",".join(ranges) if ranges else "Trunk"
+                                except:
+                                    vlan_val = "Trunk"
+                        except: pass
+
+                    dvpg_data[obj.obj._moId] = {
+                        "name": p_dict.get("name"),
+                        "vlan": vlan_val,
+                        "vms": [vm._moId for vm in p_dict.get("vm", [])],
+                        "is_uplink": is_uplink
+                    }
+            except: pass
+
+            # 3. Fetch Host Networking
+            host_nets = []
+            try:
+                view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.HostSystem], True)
+                props = self.content.propertyCollector.RetrieveContents([
+                    vim.PropertyFilterSpec(
+                        propSet=[vim.PropertySpec(type=vim.HostSystem, pathSet=[
+                            "name", "config.network.vswitch", "config.network.portgroup", 
+                            "config.network.vnic", "config.network.pnic", "config.network.proxySwitch"
+                        ])],
+                        objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
+                    )
+                ])
+                view.Destroy()
+                for obj in props:
+                    p_dict = {p.name: p.val for p in obj.propSet}
+                    
+                    # Map pNIC keys to device names for this host
+                    pnic_map = {p.key: p.device for p in p_dict.get("config.network.pnic", [])}
+                    
+                    switches = []
+                    for vss in p_dict.get("config.network.vswitch", []):
+                        switches.append({
+                            "name": vss.name,
+                            "type": "standard",
+                            "uplinks": [pnic_map.get(u, u) for u in (vss.pnic or [])],
+                            "portgroups": vss.portgroup or []
+                        })
+                    
+                    for ps in p_dict.get("config.network.proxySwitch", []):
+                        switches.append({
+                            "name": ps.dvsName,
+                            "type": "distributed",
+                            "uplinks": [pnic_map.get(pnic, pnic) for pnic in (ps.pnic or [])],
+                            "dvs_uuid": ps.dvsUuid
+                        })
+
+                    portgroups = []
+                    for pg in p_dict.get("config.network.portgroup", []):
+                        portgroups.append({
+                            "name": pg.spec.name,
+                            "vlan": pg.spec.vlanId,
+                            "vswitch": pg.spec.vswitchName
+                        })
+
+                    vmkernels = []
+                    for vnic in p_dict.get("config.network.vnic", []):
+                        vmkernels.append({
+                            "device": vnic.device,
+                            "ip": vnic.spec.ip.ipAddress if vnic.spec and vnic.spec.ip else "N/A",
+                            "portgroup": vnic.portgroup,
+                            "dvs_port": vnic.spec.distributedVirtualPort.portgroupKey if vnic.spec and vnic.spec.distributedVirtualPort else None
+                        })
+
+                    host_nets.append({
+                        "mo_id": obj.obj._moId,
+                        "name": p_dict.get("name"),
+                        "switches": switches,
+                        "portgroups": portgroups,
+                        "vmkernels": vmkernels,
+                        "pnics": [{"device": p.device, "key": p.key} for p in p_dict.get("config.network.pnic", [])]
+                    })
+            except: pass
+
+            return {
+                "vcenter_id": self.config.id,
+                "distributed_switches": dvs_data,
+                "distributed_portgroups": dvpg_data,
+                "hosts": host_nets
+            }
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Error fetching networks: {e}")
+            return {}

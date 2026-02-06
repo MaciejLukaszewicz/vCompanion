@@ -86,6 +86,14 @@
                 <input type="hidden" name="selected_vcenters" id="selectedVcenters">
             </form>
 
+            <div id="serverUnavailableState" class="server-unavailable-state hidden">
+                <i data-lucide="cloud-off"></i>
+                <h2>Server Unavailable</h2>
+                <p>The vCompanion server is currently unreachable.<br>Attempting to reconnect automatically...</p>
+                <div class="spinner-small" style="margin-top: 1.5rem; width: 20px; height: 20px; border-width: 2px;">
+                </div>
+            </div>
+
             <div id="loadingState" class="loading-container hidden">
                 <div class="spinner"></div>
                 <div style="text-align: center;">
@@ -98,6 +106,42 @@
 
     <script>
         lucide.createIcons();
+
+        // Server Health Monitoring
+        let isDisconnected = false;
+        let healthCheckInterval = setInterval(checkServerHealth, 3000);
+
+        async function checkServerHealth() {
+            try {
+                const response = await fetch('/login', { method: 'HEAD' });
+                // If we get any response (even 200 or 302), the server is up
+                if (isDisconnected) handleReconnect();
+            } catch (e) {
+                if (!isDisconnected) handleDisconnect();
+            }
+        }
+
+        function handleDisconnect() {
+            isDisconnected = true;
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('loginInfo').classList.add('hidden');
+            document.getElementById('serverUnavailableState').classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function handleReconnect() {
+            isDisconnected = false;
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('loginInfo').classList.remove('hidden');
+            document.getElementById('serverUnavailableState').classList.add('hidden');
+            refreshIcons();
+        }
+
+        function refreshIcons() {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
 
         // Handle form submission
         document.getElementById('loginForm').addEventListener('submit', function (e) {
@@ -124,7 +168,7 @@
         });
 
         // Reinitialize icons after any dynamic changes
-        setTimeout(() => lucide.createIcons(), 100);
+        setTimeout(refreshIcons, 100);
     </script>
 </body>
 

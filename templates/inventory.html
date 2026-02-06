@@ -126,6 +126,41 @@
         </div>
     </section>
 
+    <!-- Networking Topology Section -->
+    <section class="table-container" id="networking-section" style="margin-bottom: 2rem;">
+        <div
+            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+            <div style="display: flex; align-items: center; gap: 2rem; flex: 1;">
+                <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;"
+                    onclick="toggleInventorySection('networking-content', 'networking-toggle-icon')">
+                    <i data-lucide="network" size="18" style="color: var(--primary);"></i> Networking
+                </h2>
+
+                <!-- VLAN Search Bar -->
+                <div style="position: relative; width: 300px;">
+                    <i data-lucide="search" size="14"
+                        style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-dim);"></i>
+                    <input type="text" id="net-vlan-search" placeholder="Filter by VLAN ID or PG name..."
+                        onkeyup="if(typeof filterNetByVlan === 'function') filterNetByVlan(this.value)"
+                        style="width: 100%; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 1rem 0.4rem 2.25rem; font-size: 0.85rem; color: var(--text-main);">
+                </div>
+            </div>
+
+            <div id="networking-toggle-icon" style="transition: transform 0.3s ease; cursor: pointer;"
+                onclick="toggleInventorySection('networking-content', 'networking-toggle-icon')">
+                <i data-lucide="chevron-down"></i>
+            </div>
+        </div>
+        <!-- Removed hx-trigger="vcenter-refreshed from:body" to prevent resetting state -->
+        <div id="networking-content" style="display: none; padding: 1.5rem; max-height: 800px; overflow-y: auto;"
+            hx-get="/api/inventory/networks" hx-trigger="load">
+            <div style="padding: 2rem; text-align: center; color: var(--text-dim);">
+                <div class="spinner-small" style="margin-bottom: 1rem;"></div>
+                Loading networking topology...
+            </div>
+        </div>
+    </section>
+
     <!-- Hosts Section -->
     <section class="table-container" id="hosts-section" style="margin-bottom: 1rem;">
         <div onclick="toggleInventorySection('hosts-content', 'hosts-toggle-icon')"

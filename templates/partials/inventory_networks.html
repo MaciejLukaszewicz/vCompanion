@@ -1,0 +1,443 @@
+<div class="table-container" style="background: transparent; border: none; box-shadow: none; padding: 0;">
+    <!-- Sub-navigation -->
+    <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem;">
+        <button class="net-tab-btn active" onclick="switchNetTab('switches', this)">
+            <i data-lucide="network" size="14"></i> Switches
+        </button>
+        <button class="net-tab-btn" onclick="switchNetTab('physical', this)">
+            <i data-lucide="cpu" size="14"></i> Physical
+        </button>
+    </div>
+
+    <!-- Switches View -->
+    <div id="net-tab-switches" class="net-view">
+        {% for vc in vcenters %}
+        <div class="tree-root-container">
+            <div class="tree-header">
+                <i data-lucide="shield" style="color: var(--primary); width: 18px; height: 18px;"></i>
+                <span class="vcenter-title">{{ vc.name }}</span>
+            </div>
+
+            <div class="tree-body">
+                <!-- Distributed Switches (Global) -->
+                {% for dvs in vc.distributed_switches %}
+                <div class="tree-branch dvs-branch">
+                    <div class="branch-header">
+                        <i data-lucide="share-2" style="color: var(--primary-glow); width: 16px; height: 16px;"></i>
+                        <span class="branch-title">{{ dvs.name }}</span>
+                        <span class="badge badge-dvs">Distributed</span>
+                    </div>
+                    <div class="branch-content">
+                        {% for pg in dvs.portgroups %}
+                        <div class="tree-item portgroup-item" data-vlan="{{ pg.vlan }}">
+                            <div class="item-header">
+                                <i data-lucide="layers" style="color: var(--primary); width: 14px; height: 14px;"></i>
+                                <span class="pg-name">{{ pg.name }}</span>
+                                <span class="vlan-tag">VLAN {{ pg.vlan }}</span>
+                                {% if pg.is_uplink %}<span class="badge">Uplink PG</span>{% endif %}
+                            </div>
+                            <div class="item-details">
+                                {% for vmk in pg.vmkernels %}
+                                <div class="nested-leaf vmk">
+                                    <i data-lucide="activity"
+                                        style="color: var(--success); width: 12px; height: 12px; flex-shrink: 0;"></i>
+                                    <span class="leaf-text">{{ vmk }}</span>
+                                </div>
+                                {% endfor %}
+                                {% for vm in pg.vms %}
+                                <div class="nested-leaf vm">
+                                    <i data-lucide="monitor"
+                                        style="color: var(--primary); width: 12px; height: 12px; flex-shrink: 0;"></i>
+                                    <span class="leaf-text">{{ vm }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <!-- DVS Global Uplinks -->
+                        {% if dvs.uplinks %}
+                        <div class="tree-subbranch">
+                            <div class="subbranch-header">
+                                <i data-lucide="cable" style="color: #94a3b8; width: 14px; height: 14px;"></i>
+                                <span class="subbranch-title">Physical Uplinks (Aggregate)</span>
+                            </div>
+                            <div class="subbranch-content item-details">
+                                {% for up in dvs.uplinks %}
+                                <div class="nested-leaf">
+                                    <i data-lucide="link"
+                                        style="width: 12px; height: 12px; opacity: 0.6; flex-shrink: 0;"></i>
+                                    <span class="leaf-text" style="font-family: monospace;">{{ up }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Hosts (Standard Switches) -->
+                {% for host in vc.hosts %}
+                <div class="tree-branch host-branch">
+                    <div class="branch-header">
+                        <i data-lucide="server" style="color: var(--warning); width: 16px; height: 16px;"></i>
+                        <span class="branch-title host-name">{{ host.name }}</span>
+                    </div>
+                    <div class="branch-content">
+                        {% for sw in host.switches %}
+                        <div class="tree-subbranch vss-branch">
+                            <div class="subbranch-header">
+                                <i data-lucide="box" style="color: var(--text-dim); width: 14px; height: 14px;"></i>
+                                <span class="subbranch-title">{{ sw.name }}</span>
+                                <span class="badge badge-standard">Standard</span>
+                            </div>
+                            <div class="subbranch-content">
+                                {% for pg in sw.portgroups %}
+                                <div class="tree-item portgroup-item" data-vlan="{{ pg.vlan }}">
+                                    <div class="item-header">
+                                        <i data-lucide="layers"
+                                            style="color: var(--accent); width: 14px; height: 14px;"></i>
+                                        <span class="pg-name">{{ pg.name }}</span>
+                                        <span class="vlan-tag">VLAN {{ pg.vlan }}</span>
+                                    </div>
+                                    <div class="item-details">
+                                        {% for vmk in pg.vmkernels %}
+                                        <div class="nested-leaf vmk">
+                                            <i data-lucide="activity"
+                                                style="color: var(--success); width: 12px; height: 12px; flex-shrink: 0;"></i>
+                                            <span class="leaf-text">{{ vmk }}</span>
+                                        </div>
+                                        {% endfor %}
+                                        {% for vm in pg.vms %}
+                                        <div class="nested-leaf vm">
+                                            <i data-lucide="monitor"
+                                                style="color: var(--primary); width: 12px; height: 12px; flex-shrink: 0;"></i>
+                                            <span class="leaf-text">{{ vm }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                <!-- Local Uplinks -->
+                                {% for up in sw.uplinks %}
+                                <div class="tree-leaf-simple">
+                                    <i data-lucide="cable" style="width: 14px; height: 14px;"></i>
+                                    <span>{{ up }}</span>
+                                    <span class="badge">Uplink</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Physical View -->
+    <div id="net-tab-physical" class="net-view" style="display: none;">
+        {% for vc in vcenters %}
+        <div class="tree-root-container">
+            <div class="tree-header">
+                <i data-lucide="shield" style="color: var(--primary); width: 18px; height: 18px;"></i>
+                <span class="vcenter-title">{{ vc.name }}</span>
+            </div>
+            <div class="tree-body">
+                {% for host in vc.hosts %}
+                <div class="tree-branch physical-host">
+                    <div class="branch-header">
+                        <i data-lucide="server" style="color: var(--warning); width: 16px; height: 16px;"></i>
+                        <span class="branch-title">{{ host.name }}</span>
+                    </div>
+                    <div class="branch-content">
+                        {% for up in host.physical_uplinks %}
+                        <div class="tree-leaf-uplink">
+                            <div class="uplink-nic">
+                                <i data-lucide="cable" style="width: 14px; height: 14px;"></i>
+                                <span style="font-family: monospace; font-weight: 600;">{{ up.device }}</span>
+                            </div>
+                            <div class="uplink-connector"></div>
+                            <div class="uplink-switch">
+                                <i data-lucide="box" style="width: 14px; height: 14px;"></i>
+                                <span>{{ up.switch }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    /* Tabs */
+    .net-tab-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        color: var(--text-dim);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8125rem;
+        transition: all 0.2s;
+    }
+
+    .net-tab-btn:hover {
+        border-color: var(--text-dim);
+    }
+
+    .net-tab-btn.active {
+        background: var(--surface);
+        color: var(--text-main);
+        border-color: var(--primary);
+    }
+
+    /* Tree Layout */
+    .tree-root-container {
+        margin-bottom: 2.5rem;
+    }
+
+    .tree-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 1.25rem;
+    }
+
+    .vcenter-title {
+        font-weight: 700;
+        font-size: 1.125rem;
+        color: var(--text-main);
+    }
+
+    .tree-branch {
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+
+    .branch-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.6rem 1rem;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        font-weight: 600;
+    }
+
+    .branch-content {
+        padding-left: 2rem;
+        border-left: 1px solid var(--border);
+        margin-left: 1.5rem;
+        padding-top: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .tree-subbranch {
+        margin-top: 0.5rem;
+    }
+
+    .subbranch-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.4rem 0.75rem;
+        font-size: 0.9375rem;
+        color: var(--text-main);
+        font-weight: 500;
+    }
+
+    .subbranch-content {
+        padding-left: 2rem;
+        border-left: 1px dashed var(--border);
+        margin-left: 1rem;
+    }
+
+    .tree-item {
+        margin: 0.75rem 0;
+    }
+
+    .item-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.25rem 0;
+        flex-wrap: nowrap;
+    }
+
+    .pg-name {
+        font-weight: 600;
+        font-size: 0.9375rem;
+        color: var(--text-main);
+        white-space: nowrap;
+    }
+
+    .vlan-tag {
+        font-family: monospace;
+        font-size: 0.75rem;
+        background: rgba(59, 130, 246, 0.15);
+        color: var(--primary);
+        padding: 2px 8px;
+        border-radius: 4px;
+        white-space: nowrap;
+        font-weight: 700;
+    }
+
+    .item-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: 0.5rem 2rem;
+        padding: 0.5rem 0 0.75rem 2rem;
+    }
+
+    .nested-leaf {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem;
+        padding: 0.15rem 0;
+        font-size: 0.8125rem;
+        color: var(--text-dim);
+    }
+
+    .leaf-text {
+        white-space: normal;
+        word-break: break-all;
+        line-height: 1.4;
+    }
+
+    .tree-leaf-simple {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.4rem 0;
+        font-size: 0.8125rem;
+        color: var(--text-dim);
+    }
+
+    .badge {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        text-transform: uppercase;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .badge-dvs {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .badge-standard {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Physical View */
+    .tree-leaf-uplink {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 0;
+    }
+
+    .uplink-nic {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 0.6rem 1.25rem;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        min-width: 160px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .uplink-connector {
+        width: 60px;
+        height: 2px;
+        background: var(--border);
+        position: relative;
+    }
+
+    .uplink-connector::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        top: -5px;
+        width: 0;
+        height: 0;
+        border-top: 6px solid transparent;
+        border-bottom: 6px solid transparent;
+        border-left: 10px solid var(--border);
+    }
+
+    .uplink-switch {
+        background: rgba(255, 255, 255, 0.03);
+        min-width: 180px;
+        padding: 0.6rem 1.25rem;
+        border-left: 4px solid var(--primary);
+        border-radius: 0 8px 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-weight: 600;
+        font-size: 0.9375rem;
+    }
+</style>
+
+<script>
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    function switchNetTab(tab, btn) {
+        document.querySelectorAll('.net-view').forEach(v => v.style.display = 'none');
+        document.getElementById('net-tab-' + tab).style.display = 'block';
+        document.querySelectorAll('.net-tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    function filterNetByVlan(query) {
+        query = query.trim().toLowerCase();
+        const items = document.querySelectorAll('.portgroup-item');
+        const branches = document.querySelectorAll('.tree-branch');
+        const subbranches = document.querySelectorAll('.tree-subbranch');
+
+        if (!query) {
+            items.forEach(i => i.style.display = 'block');
+            branches.forEach(b => b.style.display = 'block');
+            subbranches.forEach(s => s.style.display = 'block');
+            return;
+        }
+
+        items.forEach(item => {
+            const vlan = item.getAttribute('data-vlan').toLowerCase();
+            const name = item.querySelector('.pg-name').textContent.toLowerCase();
+            item.style.display = (vlan.includes(query) || name.includes(query)) ? 'block' : 'none';
+        });
+
+        subbranches.forEach(sb => {
+            const hasVisibleItems = Array.from(sb.querySelectorAll('.portgroup-item')).some(i => i.style.display !== 'none');
+            sb.style.display = hasVisibleItems ? 'block' : 'none';
+        });
+
+        branches.forEach(b => {
+            const hasVisibleItems = Array.from(b.querySelectorAll('.portgroup-item')).some(i => i.style.display !== 'none');
+            const hasVisibleSubbranches = Array.from(b.querySelectorAll('.tree-subbranch')).some(sb => sb.style.display !== 'none');
+            b.style.display = (hasVisibleItems || hasVisibleSubbranches) ? 'block' : 'none';
+        });
+    }
+</script>
