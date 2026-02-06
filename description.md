@@ -24,12 +24,15 @@ vCompanion is a management tool designed to help administrators oversee multiple
 
 ## 3. Features
 - **Unified Inventory**: A clean, consistent view of resources across all connected vCenters, powered by an encrypted (AES-128) JSON caching layer.
+- **Storage Topology**: Unified management of Datastore Clusters and individual Datastores. Provides visual capacity bars, distinguishes between local and shared storage, and tracks host connectivity.
+- **Enhanced Networking**: Comprehensive mapping of Distributed Virtual Switches (DVS) and Standard Switches (VSS). Includes VLAN ID detection, portgroup association, and detailed VMkernel service tracking (Management, vMotion, vSAN, etc.).
+- **Detailed Host Overview**: In-depth host performance metrics, uptime calculation, build information, and a dedicated networking/storage profile for each ESXi server.
 - **Zero-Password-Storage**: For maximum security, vCenter passwords are never stored on disk or in browser cookies.
 - **Volatile RAM Keys**: Encryption keys are derived from user passwords (using PBKDF2) and kept only in volatile memory (RAM).
 - **Background Refresh**: Intelligent background worker that synchronizes data from vCenters every 2 minutes (configurable).
 - **Dashboard Cache**: Displays cached data immediately after login, with background updates ensuring the UI stays fresh without blocking the user.
 - **Dynamic Status Indicators**: Real-time status pills in the header showing connection states and refresh progress with countdown timers.
-- **Global Search**: Search for VMs and IP addresses across all environments simultaneously using indexed cached data.
+- **Global Search**: Search for VMs, IP addresses, and hosts across all environments simultaneously using indexed cached data.
 - **Session Management**: Secure sessions after login with a 1-hour inactivity timeout. Server restarts invalidate keys for security.
 - **Alerting & Reporting**: Integrated reporting capabilities (Excel/Pandas) for critical events and inventory.
 
