@@ -34,7 +34,7 @@
     <tbody>
         {% if alerts %}
         {% for alert in alerts %}
-        <tr style="{% if alert.is_recent %}background: rgba(var(--primary-rgb), 0.15) !important;{% endif %}">
+        <tr {% if alert.is_recent %}style="background: rgba(var(--primary-rgb), 0.15) !important;" {% endif %}>
             <td><span class="status-badge {{ alert.severity }}">{{ alert.severity | upper }}</span></td>
             <td>
                 <div

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -74,6 +74,11 @@
             </div>
 
             <div class="vcenter-actions">
+                <div id="session-timer"
+                    style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: rgba(var(--primary-rgb), 0.1); border-radius: 6px; font-size: 0.85rem; color: var(--text-dim);">
+                    <i data-lucide="clock" size="16"></i>
+                    <span id="session-time-remaining">--:--</span>
+                </div>
                 <button class="btn-refresh-all" hx-post="/api/vcenters/refresh-all" hx-swap="none"
                     title="Refresh all connected vCenters">
                     <i data-lucide="refresh-cw"></i>
@@ -421,6 +426,72 @@
         document.head.appendChild(styles);
 
         window.showNotification = showNotification;
+
+        // Session timeout countdown
+        {% if username %}
+        (function () {
+            const SESSION_TIMEOUT = {{ settings.app_settings.session_timeout }};
+            const WARNING_THRESHOLD = 300; // 5 minutes warning
+            let sessionStartTime = Date.now();
+
+            // Try to get last activity from sessionStorage
+            const lastActivity = sessionStorage.getItem('lastActivity');
+            if (lastActivity) {
+                sessionStartTime = parseInt(lastActivity);
+            } else {
+                sessionStorage.setItem('lastActivity', sessionStartTime.toString());
+            }
+
+            function updateSessionTimer() {
+                const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+                const remaining = Math.max(0, SESSION_TIMEOUT - elapsed);
+
+                const minutes = Math.floor(remaining / 60);
+                const seconds = remaining % 60;
+
+                const timerElement = document.getElementById('session-time-remaining');
+                if (timerElement) {
+                    timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                    const timerContainer = document.getElementById('session-timer');
+                    if (timerContainer) {
+                        // Change color based on remaining time
+                        if (remaining <= 60) {
+                            timerContainer.style.background = 'rgba(239, 68, 68, 0.2)';
+                            timerContainer.style.color = 'var(--danger)';
+                        } else if (remaining <= WARNING_THRESHOLD) {
+                            timerContainer.style.background = 'rgba(245, 158, 11, 0.2)';
+                            timerContainer.style.color = 'var(--warning)';
+                    } else {
+                            timerContainer.style.background = 'rgba(var(--primary-rgb), 0.1)';
+                            timerContainer.style.color = 'var(--text-dim)';
+                        }
+                    }
+                }
+
+                // Redirect to login when session expires
+                if (remaining <= 0) {
+                    sessionStorage.removeItem('lastActivity');
+                    window.location.href = '/login';
+                }
+            }
+
+            // Update every second
+            setInterval(updateSessionTimer, 1000);
+            updateSessionTimer();
+
+            // Reset timer on user activity
+            const resetTimer = () => {
+                sessionStartTime = Date.now();
+                sessionStorage.setItem('lastActivity', sessionStartTime.toString());
+            };
+
+            // Listen for user activity
+            ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+                document.addEventListener(event, resetTimer, { passive: true });
+            });
+        })();
+        {% endif %}
     </script>
     {% block extra_scripts %} {% endblock %}
 </body>
