@@ -1,10 +1,296 @@
 {% extends "base.html" %}
-{% block title %}vCompanion - Performance{% endblock %}
+{% block title %}{{ settings.app_settings.title }} - Performance{% endblock %}
+
 {% block content %}
-<header>
-    <h1>Performance</h1>
-</header>
-<div class="table-container" style="padding: 2rem; color: var(--text-dim);">
-    This page is under construction.
+<div class="dashboard-container">
+    <header class="dashboard-header">
+        <div class="header-content">
+            <h1><i data-lucide="activity"></i> Performance Insights</h1>
+            <p>Real-time resource consumption snapshot (cached)</p>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn-refresh-all" hx-post="/api/vcenters/refresh-all" hx-swap="none"
+                hx-on::after-request="if(event.detail.successful) { setTimeout(() => window.location.reload(), 500); }">
+                <i data-lucide="refresh-cw"></i> Refresh Data
+            </button>
+        </div>
+    </header>
+
+    {% if total_vms == 0 and total_hosts == 0 %}
+    <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="bar-chart-2"></i></div>
+        <h3>No Performance Data</h3>
+        <p>Connect vCenters to see performance metrics here.</p>
+    </div>
+    {% else %}
+
+    <!-- Cluster Resource Overview -->
+    {% if clusters|length > 0 %}
+    <section class="table-container" style="margin-bottom: 2rem;">
+        <div style="padding: 1.1rem 1.5rem; border-bottom: 1px solid var(--border);">
+            <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="layers" size="18"></i> Cluster Resource Overview
+            </h2>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Cluster Name</th>
+                    <th>vCenter</th>
+                    <th style="text-align: center;">Hosts</th>
+                    <th style="text-align: right;">CPU</th>
+                    <th style="text-align: right;">Memory</th>
+                    <th style="text-align: right;">Storage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cluster in clusters %}
+                <tr>
+                    <td class="primary-text" style="font-weight: 500;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <i data-lucide="server" size="14"></i> {{ cluster.name }}
+                        </div>
+                    </td>
+                    <td class="dim-text">{{ cluster.vcenter_name }}</td>
+                    <td style="text-align: center;">
+                        <span class="badge"
+                            style="background: rgba(var(--primary-rgb), 0.15); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
+                            {{ cluster.num_hosts }}
+                        </span>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 0.85rem; font-weight: 600;">{{ "%.1f"|format(cluster.cpu_pct)
+                                    }}%</span>
+                                <div class="progress-bar-sm" style="width: 60px;">
+                                    <div class="fill {% if cluster.cpu_pct > 90 %}critical{% elif cluster.cpu_pct > 75 %}warning{% endif %}"
+                                        style="width: {{ cluster.cpu_pct }}%"></div>
+                                </div>
+                            </div>
+                            <span style="font-size: 0.7rem; color: var(--text-dim);">{{ (cluster.cpu_usage_mhz /
+                                1000)|int }} / {{ (cluster.total_cpu_mhz / 1000)|int }} GHz</span>
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 0.85rem; font-weight: 600;">{{ "%.1f"|format(cluster.mem_pct)
+                                    }}%</span>
+                                <div class="progress-bar-sm" style="width: 60px;">
+                                    <div class="fill {% if cluster.mem_pct > 90 %}critical{% elif cluster.mem_pct > 75 %}warning{% endif %}"
+                                        style="width: {{ cluster.mem_pct }}%"></div>
+                                </div>
+                            </div>
+                            <span style="font-size: 0.7rem; color: var(--text-dim);">{{ (cluster.memory_usage_mb /
+                                1024)|int }} / {{ (cluster.total_memory_mb / 1024)|int }} GB</span>
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 0.85rem; font-weight: 600;">{{
+                                    "%.1f"|format(cluster.storage_pct) }}%</span>
+                                <div class="progress-bar-sm" style="width: 60px;">
+                                    <div class="fill {% if cluster.storage_pct > 90 %}critical{% elif cluster.storage_pct > 75 %}warning{% endif %}"
+                                        style="width: {{ cluster.storage_pct }}%"></div>
+                                </div>
+                            </div>
+                            <span style="font-size: 0.7rem; color: var(--text-dim);">{{ cluster.storage_used_gb }} / {{
+                                cluster.storage_capacity_gb }} GB</span>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- Top Consumers Grid -->
+    <div class="grid-2-col"
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 1.5rem;">
+
+        <!-- Top VMs CPU -->
+        <article class="card">
+            <div class="card-header">
+                <h3><i data-lucide="cpu"></i> Top VMs by CPU Usage</h3>
+                <span class="badge">% Utilization</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>VM Name</th>
+                            <th>vCenter</th>
+                            <th style="text-align: right; width: 180px;">CPU %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vm in top_cpu_vms %}
+                        <tr>
+                            <td class="primary-text" style="font-weight: 500;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <i data-lucide="monitor" size="14"></i> {{ vm.name }}
+                                </div>
+                            </td>
+                            <td class="dim-text">{{ vm.vcenter_name }}</td>
+                            <td style="text-align: right;">
+                                <div
+                                    style="display: flex; align-items: center; gap: 0.75rem; justify-content: flex-end;">
+                                    <span style="font-family: monospace; min-width: 50px; font-weight: 600;">{{
+                                        "%.1f"|format(vm.cpu_pct) }}%</span>
+                                    <div class="progress-bar-sm" style="width: 80px;">
+                                        <div class="fill {% if vm.cpu_pct > 90 %}critical{% elif vm.cpu_pct > 75 %}warning{% endif %}"
+                                            style="width: {{ vm.cpu_pct }}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <!-- Top VMs Memory -->
+        <article class="card">
+            <div class="card-header">
+                <h3><i data-lucide="server"></i> Top VMs by Memory Usage</h3>
+                <span class="badge">MB Guest Active</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>VM Name</th>
+                            <th>vCenter</th>
+                            <th style="text-align: right;">Memory Active</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vm in top_mem_vms %}
+                        <tr>
+                            <td class="primary-text" style="font-weight: 500;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <i data-lucide="monitor" size="14"></i> {{ vm.name }}
+                                </div>
+                            </td>
+                            <td class="dim-text">{{ vm.vcenter_name }}</td>
+                            <td style="text-align: right; font-family: monospace;">
+                                <div
+                                    style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                                    <span>{{ vm.mem_usage_guest }} MB</span>
+                                    <div
+                                        style="width: 60px; height: 4px; background: var(--bg-secondary); border-radius: 2px; overflow: hidden;">
+                                        <div
+                                            style="width: 100%; height: 100%; background: var(--accent); opacity: {{ (vm.mem_usage_guest / (top_mem_vms[0].mem_usage_guest + 1)) * 100 }}%;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <!-- Top Hosts CPU -->
+        <article class="card">
+            <div class="card-header">
+                <h3><i data-lucide="cpu"></i> Top Hosts by CPU Load</h3>
+                <span class="badge">% Utilization</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Host</th>
+                            <th>vCenter</th>
+                            <th style="text-align: right; width: 180px;">CPU %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for host in top_cpu_hosts %}
+                        <tr>
+                            <td class="primary-text" style="font-weight: 500;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <i data-lucide="server" size="14"></i> {{ host.name }}
+                                </div>
+                            </td>
+                            <td class="dim-text">{{ host.vcenter_name }}</td>
+                            <td style="text-align: right;">
+                                <div
+                                    style="display: flex; align-items: center; gap: 0.75rem; justify-content: flex-end;">
+                                    <span style="font-family: monospace; min-width: 50px; font-weight: 600;">{{
+                                        "%.1f"|format(host.cpu_pct) }}%</span>
+                                    <div class="progress-bar-sm" style="width: 80px;">
+                                        <div class="fill {% if host.cpu_pct > 90 %}critical{% elif host.cpu_pct > 75 %}warning{% endif %}"
+                                            style="width: {{ host.cpu_pct }}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <!-- Top Hosts Memory -->
+        <article class="card">
+            <div class="card-header">
+                <h3><i data-lucide="hard-drive"></i> Top Hosts by Memory Usage</h3>
+                <span class="badge">% Used</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Host</th>
+                            <th>vCenter</th>
+                            <th style="width: 150px; text-align: right;">Usage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for host in top_mem_hosts %}
+                        {% set mem_pct = (host.memory_usage_mb / host.memory_total_mb * 100) if host.memory_total_mb > 0
+                        else 0 %}
+                        <tr>
+                            <td class="primary-text" style="font-weight: 500;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <i data-lucide="server" size="14"></i> {{ host.name }}
+                                </div>
+                            </td>
+                            <td class="dim-text">{{ host.vcenter_name }}</td>
+                            <td style="text-align: right;">
+                                <div
+                                    style="display: flex; align-items: center; gap: 0.5rem; justify-content: flex-end;">
+                                    <span style="font-family: monospace; min-width: 40px;">{{ "%.1f"|format(mem_pct)
+                                        }}%</span>
+                                    <div class="progress-bar-sm" style="width: 60px;">
+                                        <div class="fill {% if mem_pct > 90 %}critical{% elif mem_pct > 75 %}warning{% endif %}"
+                                            style="width: {{ mem_pct }}%"></div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 0.7rem; color: var(--text-dim);">
+                                    {{ (host.memory_usage_mb / 1024)|int }} / {{ (host.memory_total_mb / 1024)|int }} GB
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+    </div>
+    {% endif %}
 </div>
+
+<script>
+    lucide.createIcons();
+</script>
 {% endblock %}

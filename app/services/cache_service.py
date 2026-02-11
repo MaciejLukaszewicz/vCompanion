@@ -39,7 +39,7 @@ class CacheService:
         project_root = Path(__file__).parent.parent.parent
         self.data_dir = project_root / "data"
         self.data_dir.mkdir(exist_ok=True)
-        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}, "storage": {}}
+        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}, "storage": {}, "clusters": {}}
         self.salt_path = self.data_dir / "salt.bin"
         if not self.salt_path.exists():
             self.salt = os.urandom(16)
@@ -63,7 +63,7 @@ class CacheService:
     def lock(self):
         self._fernet = None
         self._is_unlocked = False
-        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}, "storage": {}}
+        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}, "storage": {}, "clusters": {}}
 
     def _get_file_path(self, type_name: str) -> Path: return self.data_dir / f"{type_name}.enc"
 
@@ -133,6 +133,11 @@ class CacheService:
         self._data["storage"][vcenter_id] = storage
         self._save_to_disk()
 
+    def save_clusters(self, vcenter_id: str, clusters: list):
+        if not self._is_unlocked: return
+        self._data["clusters"][vcenter_id] = clusters
+        self._save_to_disk()
+
     def get_all_vms(self):
         all_vms = []
         for vms in self._data["vms"].values(): all_vms.extend(vms)
@@ -147,6 +152,11 @@ class CacheService:
         all_alerts = []
         for alerts in self._data["alerts"].values(): all_alerts.extend(alerts)
         return all_alerts
+
+    def get_all_clusters(self):
+        all_clusters = []
+        for clusters in self._data["clusters"].values(): all_clusters.extend(clusters)
+        return all_clusters
 
     def get_all_networks(self):
         return self._data["networks"]

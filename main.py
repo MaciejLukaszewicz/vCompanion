@@ -169,9 +169,81 @@ async def datastores_page(request: Request):
         "active_page": "datastores", "vcenter_status": get_vcenter_status(request)
     })
 
+@app.get("/performance")
+async def performance_page(request: Request):
+    if not is_authenticated(request): return RedirectResponse(url="/login", status_code=303)
+    
+    # Calculate performance stats
+    vcenter_manager = request.app.state.vcenter_manager
+    vms = vcenter_manager.cache.get_all_vms()
+    hosts = vcenter_manager.cache.get_all_hosts()
+    clusters = vcenter_manager.cache.get_all_clusters()
+    
+    # Calculate CPU percentage for VMs and add to dict
+    for vm in vms:
+        # For VMs: cpu_usage is in MHz, we need to calculate % based on allocated vCPUs
+        # Typical approach: assume ~2000-3000 MHz per vCPU as baseline
+        # Better: use max_cpu_mhz if available, otherwise estimate
+        vcpu = vm.get('vcpu', 0)
+        current_cpu = vm.get('cpu_usage', 0)
+        max_cpu = vm.get('max_cpu_mhz', 0)
+        
+        # If max_cpu_mhz is 0 or unreliable, estimate based on vCPU count
+        if max_cpu == 0 and vcpu > 0:
+            max_cpu = vcpu * 2400  # Assume 2.4 GHz per vCPU
+        
+        vm['cpu_pct'] = (current_cpu / max_cpu * 100) if max_cpu > 0 else 0
+        vm['max_cpu_mhz'] = max_cpu
+    
+    # Calculate CPU percentage for Hosts
+    for host in hosts:
+        cpu_cores = host.get('cpu_cores', 0)
+        cpu_mhz = host.get('cpu_mhz', 0)
+        max_cpu = cpu_cores * cpu_mhz
+        current_cpu = host.get('cpu_usage_mhz', 0)
+        host['cpu_pct'] = (current_cpu / max_cpu * 100) if max_cpu > 0 else 0
+        host['max_cpu_mhz'] = max_cpu
+    
+    # Calculate percentages for Clusters
+    for cluster in clusters:
+        # CPU percentage
+        total_cpu = cluster.get('total_cpu_mhz', 0)
+        cpu_usage = cluster.get('cpu_usage_mhz', 0)
+        cluster['cpu_pct'] = (cpu_usage / total_cpu * 100) if total_cpu > 0 else 0
+        
+        # Memory percentage
+        total_mem = cluster.get('total_memory_mb', 0)
+        mem_usage = cluster.get('memory_usage_mb', 0)
+        cluster['mem_pct'] = (mem_usage / total_mem * 100) if total_mem > 0 else 0
+        
+        # Storage percentage
+        storage_capacity = cluster.get('storage_capacity_gb', 0)
+        storage_used = cluster.get('storage_used_gb', 0)
+        cluster['storage_pct'] = (storage_used / storage_capacity * 100) if storage_capacity > 0 else 0
+    
+    # Top 10 VMs by CPU % (only powered on VMs)
+    powered_on_vms = [vm for vm in vms if vm.get('power_state') == 'poweredOn']
+    top_cpu_vms = sorted(powered_on_vms, key=lambda x: x.get('cpu_pct', 0), reverse=True)[:10]
+    
+    # Top 10 VMs by Memory (Guest)
+    top_mem_vms = sorted(powered_on_vms, key=lambda x: x.get('mem_usage_guest', 0), reverse=True)[:10]
+    
+    # Top 10 Hosts by CPU %
+    top_cpu_hosts = sorted(hosts, key=lambda x: x.get('cpu_pct', 0), reverse=True)[:10]
+    
+    # Top 10 Hosts by Memory
+    top_mem_hosts = sorted(hosts, key=lambda x: x.get('memory_usage_mb', 0), reverse=True)[:10]
+
     return templates.TemplateResponse("performance.html", {
         "request": request, "username": request.session.get("username"),
-        "active_page": "performance", "vcenter_status": get_vcenter_status(request)
+        "active_page": "performance", "vcenter_status": get_vcenter_status(request),
+        "clusters": clusters,
+        "top_cpu_vms": top_cpu_vms,
+        "top_mem_vms": top_mem_vms,
+        "top_cpu_hosts": top_cpu_hosts,
+        "top_mem_hosts": top_mem_hosts,
+        "total_vms": len(powered_on_vms),
+        "total_hosts": len(hosts)
     })
 
 @app.get("/settings")

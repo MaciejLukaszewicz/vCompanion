@@ -89,11 +89,15 @@ class VCenterManager:
             networks = conn.get_networks_speed()
             self.cache.save_networks(vc_id, networks)
 
-            # 5. Fetch Storage
+            # 5. Fetch Clusters
+            clusters = conn.get_clusters()
+            self.cache.save_clusters(vc_id, clusters)
+
+            # 6. Fetch Storage
             storage = conn.get_storage_speed()
             self.cache.save_storage(vc_id, storage)
 
-            # 6. Fetch About info (version, build, etc.)
+            # 7. Fetch About info (version, build, etc.)
             about = conn.content.about
             metadata = {
                 "version": about.version,
@@ -245,7 +249,9 @@ class VCenterConnection:
                 "guest.net", "snapshot",
                 "config.hardware.numCPU", "config.hardware.memoryMB",
                 "summary.storage.committed", "summary.storage.uncommitted",
-                "summary.config.annotation"
+                "summary.config.annotation",
+                "summary.quickStats.overallCpuUsage", "summary.quickStats.guestMemoryUsage",
+                "summary.quickStats.hostMemoryUsage", "runtime.maxCpuUsage"
             ]
             
             spec = vim.PropertyFilterSpec(
@@ -272,7 +278,11 @@ class VCenterConnection:
                     "vram_mb": 0,
                     "storage_committed": 0,
                     "storage_uncommitted": 0,
-                    "notes": ""
+                    "notes": "",
+                    "cpu_usage": 0,
+                    "max_cpu_mhz": 0,
+                    "mem_usage_guest": 0,
+                    "mem_usage_host": 0
                 }
                 
                 for p in obj.propSet:
@@ -296,6 +306,10 @@ class VCenterConnection:
                     elif p.name == "snapshot" and p.val:
                         d["snapshots"] = get_snaps(p.val.rootSnapshotList)
                         d["snapshot_count"] = len(d["snapshots"])
+                    elif p.name == "summary.quickStats.overallCpuUsage": d["cpu_usage"] = p.val or 0
+                    elif p.name == "summary.quickStats.guestMemoryUsage": d["mem_usage_guest"] = p.val or 0
+                    elif p.name == "summary.quickStats.hostMemoryUsage": d["mem_usage_host"] = p.val or 0
+                    elif p.name == "runtime.maxCpuUsage": d["max_cpu_mhz"] = p.val or 0
                 
                 vms.append(d)
             return vms
@@ -311,7 +325,7 @@ class VCenterConnection:
             paths = [
                 "name", "config.product.version", "config.product.build", 
                 "runtime.bootTime", "runtime.powerState",
-                "summary.hardware.numCpuCores", "summary.hardware.memorySize",
+                "summary.hardware.numCpuCores", "summary.hardware.cpuMhz", "summary.hardware.memorySize",
                 "summary.quickStats.overallCpuUsage", "summary.quickStats.overallMemoryUsage",
                 "config.network.vnic", "config.network.pnic", 
                 "config.network.vswitch", "config.network.proxySwitch",
@@ -343,6 +357,7 @@ class VCenterConnection:
                     "boot_time": p_dict.get("runtime.bootTime").isoformat() if p_dict.get("runtime.bootTime") else None,
                     "power_state": p_dict.get("runtime.powerState", "Unknown"),
                     "cpu_cores": p_dict.get("summary.hardware.numCpuCores", 0),
+                    "cpu_mhz": p_dict.get("summary.hardware.cpuMhz", 0),
                     "memory_total_mb": int(p_dict.get("summary.hardware.memorySize", 0) / (1024*1024)),
                     "cpu_usage_mhz": p_dict.get("summary.quickStats.overallCpuUsage", 0),
                     "memory_usage_mb": p_dict.get("summary.quickStats.overallMemoryUsage", 0),
@@ -412,6 +427,102 @@ class VCenterConnection:
             return hosts
         except Exception as e:
             logger.error(f"Error fetching hosts: {e}")
+            return []
+
+    def get_clusters(self):
+        """Fetch compute clusters with aggregated resource stats."""
+        if not self.content: return []
+        try:
+            view = self.content.viewManager.CreateContainerView(
+                self.content.rootFolder, [vim.ClusterComputeResource], True
+            )
+            
+            paths = [
+                "name", "host", "datastore",
+                "summary.numHosts", "summary.numCpuCores", "summary.totalCpu",
+                "summary.totalMemory", "summary.effectiveCpu", "summary.effectiveMemory"
+            ]
+            
+            spec = vim.PropertyFilterSpec(
+                propSet=[vim.PropertySpec(type=vim.ClusterComputeResource, pathSet=paths)],
+                objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[
+                    vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)
+                ])]
+            )
+            props = self.content.propertyCollector.RetrieveContents([spec])
+            view.Destroy()
+            
+            clusters = []
+            for obj in props:
+                p_dict = {p.name: p.val for p in obj.propSet}
+                
+                # Get host MORs for this cluster
+                host_mors = p_dict.get("host", [])
+                
+                # Get datastore MORs
+                ds_mors = p_dict.get("datastore", [])
+                
+                # Fetch quick stats for hosts in this cluster
+                cpu_usage_total = 0
+                mem_usage_total = 0
+                
+                if host_mors:
+                    host_spec = vim.PropertyFilterSpec(
+                        propSet=[vim.PropertySpec(type=vim.HostSystem, pathSet=[
+                            "summary.quickStats.overallCpuUsage",
+                            "summary.quickStats.overallMemoryUsage"
+                        ])],
+                        objectSet=[vim.ObjectSpec(obj=h) for h in host_mors]
+                    )
+                    try:
+                        host_props = self.content.propertyCollector.RetrieveContents([host_spec])
+                        for h_obj in host_props:
+                            h_dict = {p.name: p.val for p in h_obj.propSet}
+                            cpu_usage_total += h_dict.get("summary.quickStats.overallCpuUsage", 0)
+                            mem_usage_total += h_dict.get("summary.quickStats.overallMemoryUsage", 0)
+                    except: pass
+                
+                # Calculate datastore capacity
+                ds_capacity_total = 0
+                ds_free_total = 0
+                
+                if ds_mors:
+                    ds_spec = vim.PropertyFilterSpec(
+                        propSet=[vim.PropertySpec(type=vim.Datastore, pathSet=[
+                            "summary.capacity", "summary.freeSpace"
+                        ])],
+                        objectSet=[vim.ObjectSpec(obj=ds) for ds in ds_mors]
+                    )
+                    try:
+                        ds_props = self.content.propertyCollector.RetrieveContents([ds_spec])
+                        for ds_obj in ds_props:
+                            ds_dict = {p.name: p.val for p in ds_obj.propSet}
+                            ds_capacity_total += ds_dict.get("summary.capacity", 0)
+                            ds_free_total += ds_dict.get("summary.freeSpace", 0)
+                    except: pass
+                
+                cluster = {
+                    "vcenter_id": self.config.id,
+                    "vcenter_name": self.config.name,
+                    "name": p_dict.get("name", "Unknown"),
+                    "num_hosts": p_dict.get("summary.numHosts", 0),
+                    "num_cpu_cores": p_dict.get("summary.numCpuCores", 0),
+                    "total_cpu_mhz": p_dict.get("summary.totalCpu", 0),
+                    "effective_cpu_mhz": p_dict.get("summary.effectiveCpu", 0),
+                    "cpu_usage_mhz": cpu_usage_total,
+                    "total_memory_mb": int(p_dict.get("summary.totalMemory", 0) / (1024*1024)),
+                    "effective_memory_mb": int(p_dict.get("summary.effectiveMemory", 0)),
+                    "memory_usage_mb": mem_usage_total,
+                    "storage_capacity_gb": int(ds_capacity_total / (1024**3)),
+                    "storage_free_gb": int(ds_free_total / (1024**3)),
+                    "storage_used_gb": int((ds_capacity_total - ds_free_total) / (1024**3))
+                }
+                
+                clusters.append(cluster)
+            
+            return clusters
+        except Exception as e:
+            logger.error(f"Error fetching clusters: {e}")
             return []
 
     def get_recent_events(self, minutes=30):
