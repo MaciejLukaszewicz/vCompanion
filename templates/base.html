@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}vCompanion{% endblock %}</title>
+    <title>{% block title %}{{ settings.app_settings.title }}{% endblock %}</title>
     <link rel="icon" href="/static/favicon.png" type="image/png">
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://unpkg.com/htmx.org@1.9.10" crossorigin="anonymous"></script>
@@ -13,12 +13,12 @@
     {% block extra_head %}{% endblock %}
 </head>
 
-<body>
+<body class="theme-{{ settings.app_settings.theme }} accent-{{ settings.app_settings.accent_color }}">
     <!-- Sidebar Navigation -->
     <aside>
         <div class="logo">
             <i data-lucide="shield-check" style="stroke-width: 3px;"></i>
-            vCompanion
+            {{ settings.app_settings.title }}
         </div>
         <nav>
             <ul>

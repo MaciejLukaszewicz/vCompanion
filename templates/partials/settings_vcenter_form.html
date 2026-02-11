@@ -1,0 +1,49 @@
+<form hx-post="/api/settings/vcenters/{{ 'update/' + vc.id if mode == 'edit' else 'add' }}"
+    hx-target="#vcenter-list-container" hx-on::after-request="closeVcenterModal()" class="vcompanion-form">
+
+    <div class="form-group">
+        <label><i data-lucide="tag" size="16"></i> Friendly Name</label>
+        <input type="text" name="name" value="{{ vc.name if vc else '' }}" placeholder="e.g. Production Cluster"
+            required autofocus>
+        <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem;">A unique name to identify this
+            vCenter.</p>
+    </div>
+
+    <div class="form-group">
+        <label><i data-lucide="server" size="16"></i> vCenter Host/IP</label>
+        <input type="text" name="host" value="{{ vc.host if vc else '' }}" placeholder="vcenter.company.com" required>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label><i data-lucide="network" size="16"></i> Port</label>
+            <input type="number" name="port" value="{{ vc.port if vc else 443 }}" required>
+        </div>
+        <div class="form-group">
+            <label><i data-lucide="clock" size="16"></i> Refresh (sec)</label>
+            <input type="number" name="refresh_interval" value="{{ vc.refresh_interval if vc else '' }}"
+                placeholder="120">
+        </div>
+    </div>
+
+    <div class="checkbox-group"
+        style="padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;">
+        <input type="checkbox" name="verify_ssl" id="v_ssl_edit" {{ 'checked' if vc and vc.verify_ssl else '' }}>
+        <label for="v_ssl_edit"
+            style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+            <i data-lucide="shield-check" size="16"></i> Verify SSL Certificate
+        </label>
+    </div>
+
+    <div
+        style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+        <button type="button" class="btn-secondary" onclick="closeVcenterModal()">Cancel</button>
+        <button type="submit" class="btn-primary">
+            <i data-lucide="{{ 'save' if mode == 'edit' else 'plug' }}"></i>
+            {{ 'Update Configuration' if mode == 'edit' else 'Connect & Save' }}
+        </button>
+    </div>
+</form>
+<script>
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+</script>

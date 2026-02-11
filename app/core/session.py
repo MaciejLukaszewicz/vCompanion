@@ -2,11 +2,12 @@ from fastapi import Request, HTTPException, status
 from datetime import datetime, timedelta
 from typing import Optional
 import logging
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Session configuration
-SESSION_TIMEOUT_SECONDS = 3600  # 1 hour
+# SESSION_TIMEOUT_SECONDS is now managed via settings.app_settings.session_timeout
 SESSION_KEY_USERNAME = "username"
 # PASSWORD IS NO LONGER STORED IN SESSION FOR SECURITY (ZERO-PASSWORD-STORAGE)
 SESSION_KEY_LAST_ACTIVITY = "last_activity"
@@ -17,24 +18,31 @@ def is_authenticated(request: Request) -> bool:
     if SESSION_KEY_USERNAME not in request.session:
         return False
     
+    username = request.session.get(SESSION_KEY_USERNAME)
+    
     # Check session timeout
     last_activity = request.session.get(SESSION_KEY_LAST_ACTIVITY)
     if last_activity:
         try:
             last_activity_time = datetime.fromisoformat(last_activity)
-            if datetime.now() - last_activity_time > timedelta(seconds=SESSION_TIMEOUT_SECONDS):
-                logger.info("Session expired due to inactivity")
+            timeout = settings.app_settings.session_timeout
+            if datetime.now() - last_activity_time > timedelta(seconds=timeout):
+                logger.info(f"Session for user '{username}' expired due to inactivity ({timeout}s)")
                 return False
-        except:
+        except Exception as e:
+            logger.error(f"Error parsing session activity for '{username}': {e}")
             return False
     
     # In Zero-Password-Storage, session is only valid if server has the manager and cache is unlocked
-    if not hasattr(request.app.state, 'vcenter_manager'):
+    manager = getattr(request.app.state, 'vcenter_manager', None)
+    if not manager:
+        # This usually means the server restarted and the manager was lost
+        logger.warning(f"Auth failed for '{username}': vcenter_manager missing from app state (Server restart?)")
         return False
         
-    if not request.app.state.vcenter_manager.cache.is_unlocked():
-        # If server restarted, session might look alive but key is gone
-        logger.warning("Session looks alive but cache is locked (server restart?).")
+    if not manager.cache.is_unlocked():
+        # If server restarted, session might look alive but key is gone (Zero-Password-Storage)
+        logger.warning(f"Auth failed for '{username}': Cache is locked. Key likely lost during restart.")
         return False
             
     return True

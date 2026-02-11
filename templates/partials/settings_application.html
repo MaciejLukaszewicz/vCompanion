@@ -1,0 +1,195 @@
+{% if success_msg %}
+<div class="alert alert-success" style="margin-bottom: 1.5rem;">
+    <i data-lucide="check-circle"></i>
+    {{ success_msg }}
+</div>
+{% endif %}
+
+<form hx-post="/api/settings/application/update" hx-target="#settings-content-area" class="vcompanion-form">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+        <!-- Left Side: Basic Info -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="form-group">
+                <label><i data-lucide="tag" size="16"></i> Application Title</label>
+                <input type="text" name="title" value="{{ app_settings.title }}" placeholder="vCompanion" required>
+                <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem;">The name shown in the
+                    sidebar and browser tab.</p>
+            </div>
+
+            <div class="form-group">
+                <label><i data-lucide="timer" size="16"></i> Global Refresh Interval (seconds)</label>
+                <input type="number" name="refresh_interval_seconds" value="{{ app_settings.refresh_interval_seconds }}"
+                    min="10" required>
+                <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem;">How often the background
+                    worker updates vCenter data.</p>
+            </div>
+
+            <div class="form-group">
+                <label><i data-lucide="file-text" size="16"></i> System Log Level</label>
+                <select name="log_level" class="form-select">
+                    <option value="DEBUG" {% if app_settings.log_level=='DEBUG' %}selected{% endif %}>DEBUG (Most
+                        verbose)</option>
+                    <option value="INFO" {% if app_settings.log_level=='INFO' %}selected{% endif %}>INFO (Standard)
+                    </option>
+                    <option value="WARNING" {% if app_settings.log_level=='WARNING' %}selected{% endif %}>WARNING
+                        (Errors only)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Right Side: Appearance -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="form-group">
+                <label><i data-lucide="palette" size="16"></i> Color Mode (Theme)</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
+                    <label class="theme-option {% if app_settings.theme == 'dark' %}active{% endif %}">
+                        <input type="radio" name="theme" value="dark" {% if app_settings.theme=='dark' %}checked{% endif
+                            %} style="display: none;">
+                        <i data-lucide="moon"></i> Dark Mode
+                    </label>
+                    <label class="theme-option {% if app_settings.theme == 'light' %}active{% endif %}">
+                        <input type="radio" name="theme" value="light" {% if app_settings.theme=='light' %}checked{%
+                            endif %} style="display: none;">
+                        <i data-lucide="sun"></i> Light Mode
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label><i data-lucide="droplet" size="16"></i> Accent Color</label>
+                <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                    {% for color in ['blue', 'purple', 'emerald', 'orange'] %}
+                    <label
+                        class="color-pill color-{{ color }} {% if app_settings.accent_color == color %}active{% endif %}"
+                        title="{{ color|capitalize }}">
+                        <input type="radio" name="accent_color" value="{{ color }}" {% if
+                            app_settings.accent_color==color %}checked{% endif %} style="display: none;">
+                        <div class="color-dot"></div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add script to refresh icons -->
+    <script>
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    </script>
+
+    <div
+        style="display: flex; justify-content: flex-end; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+        <button type="submit" class="btn-primary">
+            <i data-lucide="save"></i> Save Application Settings
+        </button>
+    </div>
+</form>
+
+<style>
+    .form-select {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        color: var(--text-main);
+        font-size: 0.9375rem;
+        width: 100%;
+        outline: none;
+        cursor: pointer;
+    }
+
+    .theme-option {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: var(--bg);
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+        color: var(--text-dim);
+    }
+
+    .theme-option:hover {
+        border-color: var(--text-dim);
+        color: var(--text-main);
+    }
+
+    .theme-option.active {
+        border-color: var(--primary);
+        background: rgba(var(--primary-rgb), 0.05);
+        color: var(--primary);
+    }
+
+    .color-pill {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .color-pill .color-dot {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+    }
+
+    .color-blue .color-dot {
+        background: #3b82f6;
+    }
+
+    .color-purple .color-dot {
+        background: #8b5cf6;
+    }
+
+    .color-emerald .color-dot {
+        background: #10b981;
+    }
+
+    .color-orange .color-dot {
+        background: #f59e0b;
+    }
+
+    .color-pill:hover {
+        transform: scale(1.1);
+    }
+
+    .color-pill.active {
+        border-color: var(--text-main);
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+    }
+</style>
+
+<script>
+    if (typeof refreshIcons === 'function') refreshIcons();
+
+    // UI Logic for theme/color selection
+    document.querySelectorAll('.theme-option').forEach(opt => {
+        opt.addEventListener('click', function () {
+            document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+            this.classList.add('active');
+
+            // Apply theme immediately to body
+            const theme = this.querySelector('input').value;
+            document.body.className = document.body.className.replace(/theme-\S+/g, 'theme-' + theme);
+        });
+    });
+    document.querySelectorAll('.color-pill').forEach(opt => {
+        opt.addEventListener('click', function () {
+            document.querySelectorAll('.color-pill').forEach(o => o.classList.remove('active'));
+            this.classList.add('active');
+
+            // Apply accent color immediately to body
+            const accent = this.querySelector('input').value;
+            document.body.className = document.body.className.replace(/accent-\S+/g, 'accent-' + accent);
+        });
+    });
+</script>

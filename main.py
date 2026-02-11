@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import auth, dashboard, vcenters, inventory
+from app.api import auth, dashboard, vcenters, inventory, settings as settings_api
 from app.core.session import is_authenticated
 from app.core.config import settings
 
@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("vCompanion starting up...")
+    # Ensure vcenter_manager exists from the start
+    from app.services.vcenter_service import VCenterManager
+    app.state.vcenter_manager = VCenterManager(settings.vcenters)
     yield
     # Shutdown
     if hasattr(app.state, 'vcenter_manager'):
@@ -62,12 +65,14 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 # Templates
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+templates.env.globals["settings"] = settings
 
 # Include routers
 app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(vcenters.router)
 app.include_router(inventory.router)
+app.include_router(settings_api.router)
 
 def get_vcenter_status(request: Request):
     """Helper to get vCenter connection status for templates."""
@@ -164,13 +169,26 @@ async def datastores_page(request: Request):
         "active_page": "datastores", "vcenter_status": get_vcenter_status(request)
     })
 
-@app.get("/performance")
-async def performance_page(request: Request):
-    if not is_authenticated(request): return RedirectResponse(url="/login", status_code=303)
     return templates.TemplateResponse("performance.html", {
         "request": request, "username": request.session.get("username"),
         "active_page": "performance", "vcenter_status": get_vcenter_status(request)
     })
 
+@app.get("/settings")
+async def settings_page(request: Request):
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=303)
+    
+    return templates.TemplateResponse("settings.html", {
+        "request": request,
+        "username": request.session.get("username"),
+        "active_page": "settings",
+        "vcenter_status": get_vcenter_status(request),
+        "vcenters": settings.vcenters
+    })
+
 if __name__ == "__main__":
+    # IMPORTANT: If you are using --reload, exclude the 'data' directory to prevent 
+    # the server from restarting every time the encrypted cache is saved!
+    # CLI: uvicorn main:app --reload --reload-exclude "data/*"
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

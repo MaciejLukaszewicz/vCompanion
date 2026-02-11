@@ -63,7 +63,7 @@ class CacheService:
     def lock(self):
         self._fernet = None
         self._is_unlocked = False
-        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}}
+        self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}, "storage": {}}
 
     def _get_file_path(self, type_name: str) -> Path: return self.data_dir / f"{type_name}.enc"
 

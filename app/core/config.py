@@ -16,6 +16,8 @@ class AppSettings(BaseModel):
     session_timeout: int = 3600
     log_level: str = "INFO"
     refresh_interval_seconds: int = 120
+    theme: str = "dark"  # "dark" or "light"
+    accent_color: str = "blue"  # "blue", "purple", "emerald", "orange"
 
 class Config(BaseModel):
     app_settings: AppSettings = AppSettings()
@@ -69,6 +71,23 @@ def load_config(path: str = None) -> Config:
         data = json.load(f)
     
     return Config(**data)
+
+def save_config(config: Config, path: str = None):
+    """Save configuration to config.json."""
+    if path is None:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(current_dir))
+        path = os.path.join(project_root, "config", "config.json")
+    
+    # Use dict() and model_dump() (Pydantic v2) or dict() (Pydantic v1)
+    # vCompanion seems to use Pydantic v1 or v2 depending on environment, let's be safe.
+    if hasattr(config, "model_dump"):
+        config_data = config.model_dump()
+    else:
+        config_data = config.dict()
+        
+    with open(path, "w") as f:
+        json.dump(config_data, f, indent=4)
 
 # Singleton instance
 settings = load_config()

@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from app.core.session import require_auth
 import logging
+import csv
+import io
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +202,6 @@ async def get_snapshots_partial(request: Request, today_only: bool = False):
         return int(hashlib.md5(vc_id.encode()).hexdigest(), 16) % 5
 
     # Calculate age in days
-    from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
     
     for vm in vms:
@@ -243,6 +245,141 @@ async def get_snapshots_partial(request: Request, today_only: bool = False):
         "global_snapshots": global_snapshots,
         "snap_count": len(global_snapshots)
     })
+
+@router.get("/export/vms")
+async def export_vms_csv(request: Request, q: str = "", snaps_only: bool = False):
+    """Exports the filtered VM list as a CSV file."""
+    require_auth(request)
+    if not hasattr(request.app.state, 'vcenter_manager'):
+        raise HTTPException(status_code=503, detail="Manager not ready")
+        
+    all_vms = request.app.state.vcenter_manager.cache.get_all_vms()
+    
+    # Apply filters (same logic as /vms)
+    vms = []
+    search_query = q.lower()
+    for vm in all_vms:
+        if vm.get('name', '').startswith('vCLS'): continue
+        if snaps_only and vm.get('snapshot_count', 0) == 0: continue
+        if search_query:
+            found = False
+            if search_query in vm.get('name', '').lower(): found = True
+            elif vm.get('ip') and search_query in vm.get('ip', '').lower(): found = True
+            elif search_query in vm.get('vcenter_name', '').lower(): found = True
+            elif vm.get('host') and search_query in vm.get('host', '').lower(): found = True
+            else:
+                for snap in vm.get('snapshots', []):
+                    if search_query in snap.get('name', '').lower():
+                        found = True
+                        break
+            if not found: continue
+        vms.append(vm)
+    
+    vms.sort(key=lambda x: (x.get('vcenter_name', '').lower(), x.get('name', '').lower()))
+    
+    output = io.StringIO()
+    # Use semicolon as separator as requested
+    writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Headers based on inventory_vms_list.html columns
+    writer.writerow(["Name", "vCenter", "Primary IP", "Status"])
+    
+    for vm in vms:
+        writer.writerow([
+            vm.get('name', ''),
+            vm.get('vcenter_name', ''),
+            vm.get('ip', ''),
+            'ON' if vm.get('power_state') == 'poweredOn' else 'OFF'
+        ])
+    
+    output.seek(0)
+    
+    filename = f"vm_{datetime.now().strftime('%Y%m%d-%H%M')}.csv"
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Cache-Control": "no-cache"
+        }
+    )
+
+@router.get("/export/snapshots")
+async def export_snapshots_csv(request: Request, today_only: bool = False):
+    """Exports the global snapshots list as a CSV file."""
+    require_auth(request)
+    if not hasattr(request.app.state, 'vcenter_manager'):
+        raise HTTPException(status_code=503, detail="Manager not ready")
+        
+    vms = request.app.state.vcenter_manager.cache.get_all_vms()
+    
+    global_snapshots = []
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    for vm in vms:
+        if vm.get('snapshots'):
+            for snap in vm['snapshots']:
+                created_date = snap.get('created', '').split('T')[0]
+                if today_only and created_date != today_str:
+                    continue
+                    
+                global_snapshots.append({
+                    "vm_name": vm.get('name'),
+                    "vcenter_name": vm.get('vcenter_name'),
+                    "name": snap.get('name'),
+                    "created": snap.get('created'),
+                    "description": snap.get('description')
+                })
+                
+    # Sort by creation date (newest first)
+    global_snapshots.sort(key=lambda x: x.get('created', ''), reverse=True)
+    
+    output = io.StringIO()
+    # Use semicolon as separator as requested
+    writer = csv.writer(output, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Headers based on snapshots_table.html columns
+    writer.writerow(["VM Name", "vCenter", "Snapshot Name", "Age (days)", "Created At", "Description"])
+    
+    # Calculate now once for age calculation
+    now = datetime.now(timezone.utc)
+
+    for snap in global_snapshots:
+        # Calculate age days (same logic as get_snapshots_partial)
+        age_days = 0
+        try:
+            created_date_dt = datetime.fromisoformat(snap.get('created', ''))
+            if created_date_dt.tzinfo is None:
+                created_date_dt = created_date_dt.replace(tzinfo=timezone.utc)
+            age_delta = now - created_date_dt
+            age_days = age_delta.days
+        except:
+            pass
+
+        # Format created date for better CSV readability
+        created_at = snap.get('created', '').replace('T', ' ').split('.')[0]
+        writer.writerow([
+            snap.get('vm_name', ''),
+            snap.get('vcenter_name', ''),
+            snap.get('name', ''),
+            age_days,
+            created_at,
+            snap.get('description', '')
+        ])
+    
+    output.seek(0)
+    
+    filename = f"snapshots_{datetime.now().strftime('%Y%m%d-%H%M')}.csv"
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Cache-Control": "no-cache"
+        }
+    )
 
 @router.get("/vcenters")
 async def get_vcenters_partial(request: Request):

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}vCompanion - Settings{% endblock %}
+
+{% block content %}
+<header>
+    <div>
+        <h1>System Settings</h1>
+        <p style="color: var(--text-dim); font-size: 0.875rem;">Configure your vCenter connections and application
+            preferences</p>
+    </div>
+</header>
+
+<div class="settings-container"
+    style="display: grid; grid-template-columns: 240px 1fr; gap: 2rem; margin-top: 2rem; align-items: start;">
+    <!-- Settings Sidebar -->
+    <div class="settings-nav-pane"
+        style="display: flex; flex-direction: column; gap: 0.5rem; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 12px; border: 1px solid var(--border);">
+        <div class="settings-nav-item active" hx-get="/api/settings/vcenters" hx-target="#settings-content-area"
+            onclick="updateActiveNav(this)">
+            <i data-lucide="server"></i> vCenter Connections
+        </div>
+        <div class="settings-nav-item" hx-get="/api/settings/application" hx-target="#settings-content-area"
+            onclick="updateActiveNav(this)">
+            <i data-lucide="settings"></i> Application
+        </div>
+        <div class="settings-nav-item" hx-get="/api/settings/security" hx-target="#settings-content-area"
+            onclick="updateActiveNav(this)">
+            <i data-lucide="shield"></i> Security
+        </div>
+    </div>
+
+    <!-- Settings Content -->
+    <div class="settings-main-pane table-container" style="padding: 2rem;">
+        <div id="settings-content-area">
+            {% include "partials/settings_vcenters.html" %}
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit vCenter Modal -->
+<div id="vcenterModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <span class="modal-close" onclick="closeVcenterModal()">&times;</span>
+        <h2 id="modalTitle">Add vCenter Server</h2>
+        <div id="vcenter-form-container" style="margin-top: 1.5rem;">
+            {% include "partials/settings_vcenter_form.html" %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .settings-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--text-dim);
+    }
+
+    .settings-nav-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+    }
+
+    .settings-nav-pane .settings-nav-item.active {
+        background: rgba(var(--primary-rgb), 0.15);
+        color: var(--primary);
+        font-weight: 600;
+    }
+
+    .settings-main-pane h2 {
+        color: var(--text-main);
+        font-weight: 600;
+    }
+
+    .settings-section {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateActiveNav(el) {
+        document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        // Small delay to let HTMX load content before refreshing icons
+        setTimeout(() => refreshIcons(document.getElementById('settings-content-area')), 50);
+    }
+
+    function openAddVcenterModal() {
+        document.getElementById('modalTitle').textContent = 'Add vCenter Server';
+        htmx.ajax('GET', '/api/settings/vcenters/add', { target: '#vcenter-form-container' })
+            .then(() => {
+                document.getElementById('vcenterModal').style.display = 'flex';
+                refreshIcons();
+            });
+    }
+
+    function closeVcenterModal() {
+        document.getElementById('vcenterModal').style.display = 'none';
+    }
+
+    function openEditVcenterModal(vcId) {
+        document.getElementById('modalTitle').textContent = 'Edit vCenter Server';
+        htmx.ajax('GET', `/api/settings/vcenters/edit/${vcId}`, { target: '#vcenter-form-container' })
+            .then(() => {
+                document.getElementById('vcenterModal').style.display = 'flex';
+                refreshIcons();
+            });
+    }
+
+    // Modal close logic: only close if mousedown and mouseup are both on the background
+    (function () {
+        const modal = document.getElementById('vcenterModal');
+        let startedOnBackground = false;
+
+        modal.addEventListener('mousedown', function (e) {
+            startedOnBackground = (e.target === modal);
+        });
+
+        modal.addEventListener('mouseup', function (e) {
+            if (startedOnBackground && e.target === modal) {
+                closeVcenterModal();
+            }
+            startedOnBackground = false;
+        });
+    })();
+</script>
+{% endblock %}

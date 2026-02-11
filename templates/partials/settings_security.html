@@ -1,0 +1,77 @@
+{% if success_msg %}
+<div class="alert alert-success" style="margin-bottom: 1.5rem;">
+    <i data-lucide="check-circle"></i>
+    {{ success_msg }}
+</div>
+{% endif %}
+
+<div style="display: flex; flex-direction: column; gap: 3rem;">
+    <!-- Session Section -->
+    <section>
+        <h3 style="font-size: 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="clock" size="18"></i> Session Management
+        </h3>
+        <form hx-post="/api/settings/security/update" hx-target="#settings-content-area" class="vcompanion-form">
+            <div class="form-group" style="max-width: 400px;">
+                <label><i data-lucide="timer" size="16"></i> Session Inactivity Timeout (seconds)</label>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <input type="number" name="session_timeout" value="{{ app_settings.session_timeout }}" min="60"
+                        required>
+                    <span style="color: var(--text-dim); white-space: nowrap;">
+                        ({{ (app_settings.session_timeout / 60)|round|int }} min)
+                    </span>
+                </div>
+                <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem;">
+                    The duration of inactivity before the user is automatically logged out.
+                </p>
+            </div>
+            <div style="margin-top: 1.5rem;">
+                <button type="submit" class="btn-primary" style="padding: 0.6rem 1.25rem; font-size: 0.875rem;">
+                    <i data-lucide="save"></i> Update Session Timeout
+                </button>
+            </div>
+        </form>
+        <script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
+    </section>
+
+    <!-- Data Protection Section -->
+    <section style="padding-top: 2rem; border-top: 1px solid var(--border);">
+        <h3 style="font-size: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="shield-check" size="18"></i> Data Protection
+        </h3>
+        <p style="color: var(--text-dim); font-size: 0.875rem; margin-bottom: 1.5rem;">
+            vCompanion uses a <strong>Zero-Password-Storage</strong> approach. All vCenter data saved on local disk is
+            encrypted using AES-256 (Fernet).
+        </p>
+
+        <div class="alert alert-warning"
+            style="background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.2);">
+            <i data-lucide="alert-triangle"></i>
+            <div>
+                <strong style="display: block; margin-bottom: 0.25rem;">Danger Zone: Encrypted Cache</strong>
+                Purging the local cache will permanently delete all encrypted vCenter inventory data. You will need to
+                log in again to rebuild the inventory.
+            </div>
+        </div>
+
+        <button class="btn-primary"
+            style="background: transparent; border: 1px solid var(--danger); color: var(--danger);"
+            hx-post="/api/settings/security/purge-cache"
+            hx-confirm="Are you sure you want to delete ALL encrypted cache files? This cannot be undone and you will be forced to log in again."
+            hx-on::after-request="handlePurgeResponse(event)">
+            <i data-lucide="trash-2"></i> Purge Local Encrypted Cache
+        </button>
+    </section>
+</div>
+
+<script>
+    if (typeof refreshIcons === 'function') refreshIcons();
+
+    function handlePurgeResponse(event) {
+        const response = JSON.parse(event.detail.xhr.response);
+        if (response.status === 'ok') {
+            alert(response.message);
+            window.location.href = '/login';
+        }
+    }
+</script>

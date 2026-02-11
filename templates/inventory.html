@@ -54,10 +54,15 @@
                 </form>
             </div>
 
-            <div id="vms-toggle-icon"
-                style="transition: transform 0.3s ease; transform: rotate(180deg); cursor: pointer;"
-                onclick="toggleInventorySection('vms-content', 'vms-toggle-icon')">
-                <i data-lucide="chevron-down"></i>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="header-action-icon" onclick="exportToCSV('vms')" title="Export filtered VMs to CSV">
+                    <i data-lucide="download" size="18"></i>
+                </div>
+                <div id="vms-toggle-icon"
+                    style="transition: transform 0.3s ease; transform: rotate(180deg); cursor: pointer;"
+                    onclick="toggleInventorySection('vms-content', 'vms-toggle-icon')">
+                    <i data-lucide="chevron-down"></i>
+                </div>
             </div>
         </div>
 
@@ -110,9 +115,15 @@
                 </form>
             </div>
 
-            <div id="snapshots-toggle-icon" style="transition: transform 0.3s ease; cursor: pointer;"
-                onclick="toggleInventorySection('snapshots-content', 'snapshots-toggle-icon')">
-                <i data-lucide="chevron-down"></i>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="header-action-icon" onclick="exportToCSV('snapshots')"
+                    title="Export filtered snapshots to CSV">
+                    <i data-lucide="download" size="18"></i>
+                </div>
+                <div id="snapshots-toggle-icon" style="transition: transform 0.3s ease; cursor: pointer;"
+                    onclick="toggleInventorySection('snapshots-content', 'snapshots-toggle-icon')">
+                    <i data-lucide="chevron-down"></i>
+                </div>
             </div>
         </div>
         <div id="snapshots-content" style="display: none; height: 400px; overflow-y: auto;"
@@ -254,6 +265,22 @@
         transition: background 0.2s;
     }
 
+    .header-action-icon {
+        cursor: pointer;
+        color: var(--text-dim);
+        transition: all 0.2s ease;
+        padding: 5px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .header-action-icon:hover {
+        color: var(--primary);
+        background: rgba(var(--primary-rgb), 0.1);
+    }
+
     .inventory-list-table tr:hover {
         background: rgba(var(--primary-rgb), 0.05) !important;
     }
@@ -352,56 +379,6 @@
         animation: spin 1s linear infinite;
         margin: 0 auto;
     }
-
-    /* Modern Switch Styling */
-    .switch {
-        position: relative;
-        display: inline-block;
-        width: 32px;
-        height: 18px;
-    }
-
-    .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-
-    .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: var(--border);
-        transition: .3s;
-        border-radius: 18px;
-    }
-
-    .slider:before {
-        position: absolute;
-        content: "";
-        height: 12px;
-        width: 12px;
-        left: 3px;
-        bottom: 3px;
-        background-color: white;
-        transition: .3s;
-        border-radius: 50%;
-    }
-
-    input:checked+.slider {
-        background-color: var(--primary);
-    }
-
-    input:focus+.slider {
-        box-shadow: 0 0 1px var(--primary);
-    }
-
-    input:checked+.slider:before {
-        transform: translateX(14px);
-    }
 </style>
 {% endblock %}
 
@@ -462,6 +439,42 @@
         }
     }
 
+    function exportToCSV(type) {
+        let url = `/api/inventory/export/${type}`;
 
+        // Append current filters for VMs
+        if (type === 'vms') {
+            const form = document.getElementById('vm-filters');
+            if (form) {
+                const formData = new FormData(form);
+                const params = new URLSearchParams(formData);
+                url += '?' + params.toString();
+            }
+        }
+
+        // Append current filters for Snapshots
+        if (type === 'snapshots') {
+            const form = document.getElementById('snap-filters');
+            if (form) {
+                const formData = new FormData(form);
+                const params = new URLSearchParams(formData);
+                url += '?' + params.toString();
+            }
+        }
+
+        // Trigger download
+        const icon = event.currentTarget;
+        const originalHTML = icon.innerHTML;
+        icon.style.opacity = '0.5';
+        icon.style.pointerEvents = 'none';
+
+        window.location.href = url;
+
+        // Restore icon after a short delay (standard browser behavior handles the "background" part)
+        setTimeout(() => {
+            icon.style.opacity = '1';
+            icon.style.pointerEvents = 'auto';
+        }, 2000);
+    }
 </script>
 {% endblock %}
