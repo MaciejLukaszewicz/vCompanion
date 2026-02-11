@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from app.core.session import require_auth
 from app.services.vcenter_service import VCenterManager
 from app.core.config import settings
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -94,6 +94,64 @@ async def get_alerts_table(request: Request):
     alerts = []
     if hasattr(request.app.state, 'vcenter_manager'):
         stats_data = request.app.state.vcenter_manager.get_stats()
-        alerts = stats_data.get("raw_alerts", [])
+        # Create a copy to avoid modifying the cached data
+        alerts = list(stats_data.get("raw_alerts", []))
+    
+    # Process alerts: Sort by time descending and add 'recent' flag
+    now = datetime.now()
+    seven_days_ago = now - timedelta(days=7)
+    one_day_ago = now - timedelta(days=1)
+    
+    processed_alerts = []
+    
+    stats = {
+        "last_day": 0,
+        "last_week": 0
+    }
+    
+    logger.info(f"Processing {len(alerts)} alerts for dashboard table...")
+    
+    for alert in alerts:
+        # Clone dict to avoid modifying reference
+        a = alert.copy()
+        raw_time = a.get("time", "")
+        
+        try:
+            # Parse time for sorting and comparison
+            t_str = raw_time
+            if t_str and t_str.endswith('Z'): t_str = t_str[:-1]
+            
+            t_dt = datetime.fromisoformat(t_str)
+            
+            if t_dt.tzinfo is not None:
+                t_dt = t_dt.replace(tzinfo=None)
+                
+            a["_dt"] = t_dt
+            # Highlight logic changed to 7 days (last week)
+            a["is_recent"] = t_dt > seven_days_ago
+            
+            # Stats calculation
+            if t_dt > one_day_ago:
+                stats["last_day"] += 1
+            if t_dt > seven_days_ago:
+                stats["last_week"] += 1
+            
+        except Exception as e:
+            logger.error(f"Failed to parse alert time '{raw_time}': {e}")
+            a["_dt"] = datetime.min
+            a["is_recent"] = False
+            
+        processed_alerts.append(a)
+    
+    # Sort by datetime object descending
+    processed_alerts.sort(key=lambda x: x["_dt"], reverse=True)
+    
+    if processed_alerts:
+        logger.info(f"Stats: {stats}")
+    
     from main import templates
-    return templates.TemplateResponse("partials/dashboard_alerts_table.html", {"request": request, "alerts": alerts})
+    return templates.TemplateResponse("partials/dashboard_alerts_table.html", {
+        "request": request, 
+        "alerts": processed_alerts,
+        "stats": stats
+    })

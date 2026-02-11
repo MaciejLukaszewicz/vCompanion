@@ -1,7 +1,22 @@
 <span id="alerts-count-badge" hx-swap-oob="innerHTML">
     {% if alerts|length > 0 %}
-    <span class="status-badge critical" style="padding: 2px 8px; font-size: 0.7rem; margin-left: 0.5rem;">{{
-        alerts|length }} ACTIVE</span>
+    <span class="status-badge critical"
+        style="padding: 2px 8px; font-size: 0.7rem; margin-left: 0.5rem; text-transform: uppercase;">{{
+        alerts|length }} active</span>
+
+    {% if stats.last_day > 0 %}
+    <span class="status-badge warning"
+        style="padding: 2px 8px; font-size: 0.7rem; margin-left: 0.5rem; text-transform: uppercase;">
+        Last Day: {{ stats.last_day }} active
+    </span>
+    {% endif %}
+
+    {% if stats.last_week > 0 %}
+    <span class="status-badge success"
+        style="padding: 2px 8px; font-size: 0.7rem; margin-left: 0.5rem; text-transform: uppercase;">
+        Last Week: {{ stats.last_week }} active
+    </span>
+    {% endif %}
     {% endif %}
 </span>
 
@@ -19,7 +34,7 @@
     <tbody>
         {% if alerts %}
         {% for alert in alerts %}
-        <tr>
+        <tr style="{% if alert.is_recent %}background: rgba(var(--primary-rgb), 0.15) !important;{% endif %}">
             <td><span class="status-badge {{ alert.severity }}">{{ alert.severity | upper }}</span></td>
             <td>
                 <div
@@ -33,7 +48,11 @@
             <td style="font-weight: 500;">{{ alert.alarm_name }}</td>
             <td>{{ alert.entity_name }}</td>
             <td style="font-size: 0.8rem;">{{ alert.vcenter_name }}</td>
-            <td style="color: var(--text-dim); font-size: 0.75rem;">{{ alert.time }}</td>
+            <td>
+                <div style="color: var(--text-dim); font-size: 0.75rem; white-space: nowrap;">
+                    {{ alert.time }}
+                </div>
+            </td>
         </tr>
         {% endfor %}
         {% else %}

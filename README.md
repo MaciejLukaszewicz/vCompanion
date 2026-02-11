@@ -15,12 +15,13 @@
 ## ✨ Key Features
 
 *   **🌐 Unified Inventory**: A clean, consistent view of all your resources (VMs, Hosts, Networks, Storage) across multiple vCenters.
+*   **⚙️ Advanced Settings Panel**: Comprehensive configuration for vCenter connections, application preferences (Theme, Refresh Interval), and security settings.
 *   **📂 Storage Topology**: Dedicated view for Datastore Clusters and Datastores with visual capacity bars and host access tracking.
 *   **🔗 Enhanced Networking**: Detailed visualization of Distributed and Standard switches, including VLAN IDs and VMkernel services.
 *   **🔍 Global Search**: Instant search for VMs, IP addresses, and hosts across your entire infrastructure.
-*   **📊 Proactive Dashboards**: High-level metrics for snapshots, critical issues, and resource distribution.
+*   **📊 Proactive Dashboards**: High-level metrics for snapshots, critical issues, and resource distribution with time-sorted alerts.
 *   **📈 Reporting & Alerting**: Generate Excel/CSV reports and track critical vSphere events.
-*   **🌑 Premium Dark Mode**: Modern, glassmorphism-inspired UI with interactive charts via ApexCharts.
+*   **🎨 Customizable UI**: Modern, glassmorphism-inspired UI with light/dark themes and selectable accent colors.
 *   **🚀 Zero Configuration Overhead**: Fast setup with automated virtual environment management.
 
 ---
