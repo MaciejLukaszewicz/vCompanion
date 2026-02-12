@@ -3,7 +3,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![vSphere Support](https://img.shields.io/badge/vSphere-7.0U3%2B-orange.svg)](https://www.vmware.com/products/vsphere.html)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Uptime](https://img.shields.io/badge/status-active-brightgreen.svg)]()
+[![Uptime](https://img.shields.io/badge/status-active-brightgreen.svg)](https://github.com/MaciejLukaszewicz/vCompanion)
 
 **vCompanion** is a high-end, unified management dashboard designed for vSphere administrators. It allows you to oversee multiple, non-federated vCenter environments through a single, stunning web interface.
 
@@ -121,7 +121,7 @@
 ### 1. Installation
 The easiest way to get started is via Git:
 ```powershell
-git clone https://github.com/your-username/vCompanion.git
+git clone https://github.com/MaciejLukaszewicz/vCompanion.git
 cd vCompanion
 .\setup\setup.bat
 ```
@@ -176,7 +176,7 @@ Keep your installation up-to-date with one command:
 ## 📝 Documentation
 For more detailed information, please refer to:
 - [Technical Description](description.md)
-- [Installation Guide](INSTALL.md) (Coming soon)
+- [Installation Guide](INSTALL.md)
 
 ---
 

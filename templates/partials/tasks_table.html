@@ -18,14 +18,8 @@
             </td>
             <td>
                 {% if task.status == 'running' %}
-                <div style="display: flex; flex-direction: column; gap: 4px; width: 80px;">
-                    <span style="font-size: 0.65rem; color: var(--primary);">RUNNING {{ task.progress }}%</span>
-                    <div style="height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;">
-                        <div
-                            style="height: 100%; width: {{ task.progress }}%; background: var(--primary); box-shadow: 0 0 10px var(--primary-shadow);">
-                        </div>
-                    </div>
-                </div>
+                <span class="status-badge"
+                    style="font-size: 0.65rem; background: rgba(var(--primary-rgb), 0.15); color: var(--primary);">RUNNING</span>
                 {% elif task.status == 'success' %}
                 <span class="status-badge success" style="font-size: 0.65rem;">SUCCESS</span>
                 {% elif task.status == 'error' %}

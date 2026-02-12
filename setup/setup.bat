@@ -1,5 +1,6 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
+cd /d "%~dp0"
 
 echo ==========================================
 echo    vCompanion Setup for Windows
