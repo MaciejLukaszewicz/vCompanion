@@ -1,4 +1,5 @@
 import ssl
+import socket
 import logging
 import threading
 import time
@@ -115,6 +116,11 @@ class VCenterManager:
             self.cache.update_vcenter_status(vc_id, conn.config.name, 'ERROR', str(e))
 
     def connect_all(self, user, password, selected_ids=None):
+        """
+        Connect to selected vCenters.
+        Returns: dict with vc_id as key and dict with connection result details as value
+        Example: {'vc1': {'success': True}, 'vc2': {'success': False, 'error_type': 'timeout', 'error_msg': '...'}}
+        """
         if not self.cache.is_unlocked():
             if not self.cache.derive_key(password): return {}
         self.start_worker()
@@ -122,9 +128,14 @@ class VCenterManager:
         results = {}
         for vid in target_ids:
             if vid in self.connections:
-                success = self.connections[vid].connect(user, password)
-                results[vid] = success
-                if success: self.trigger_refresh(vid)
+                success, error_type, error_msg = self.connections[vid].connect(user, password)
+                results[vid] = {
+                    'success': success,
+                    'error_type': error_type,
+                    'error_msg': error_msg
+                }
+                if success: 
+                    self.trigger_refresh(vid)
         return results
 
     def disconnect_all(self):
@@ -205,12 +216,48 @@ class VCenterConnection:
         except: return False
 
     def connect(self, user, password):
+        """
+        Attempt to connect to vCenter.
+        Returns: tuple (success: bool, error_type: str|None, error_msg: str|None)
+        error_type can be: 'auth', 'network', 'timeout', 'ssl', 'unknown'
+        """
         try:
             ctx = None if self.config.verify_ssl else ssl._create_unverified_context()
             self.si = SmartConnect(host=self.config.host, user=user, pwd=password, port=self.config.port, sslContext=ctx)
             self.content = self.si.RetrieveContent()
-            return True
-        except: return False
+            logger.info(f"[{self.config.name}] Successfully connected")
+            return (True, None, None)
+        except vim.fault.InvalidLogin as e:
+            # Wrong username or password
+            logger.warning(f"[{self.config.name}] Authentication failed: Invalid credentials")
+            return (False, 'auth', 'Invalid username or password')
+        except (ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError) as e:
+            # Connection refused - vCenter might be down or unreachable
+            logger.error(f"[{self.config.name}] Connection refused: {str(e)}")
+            return (False, 'network', f'Connection refused - vCenter may be down or unreachable')
+        except (TimeoutError, socket.timeout) as e:
+            # Timeout - network issue or VPN disconnected
+            logger.error(f"[{self.config.name}] Connection timeout: {str(e)}")
+            return (False, 'timeout', 'Connection timeout - check network connectivity or VPN')
+        except ssl.SSLError as e:
+            # SSL certificate error
+            logger.error(f"[{self.config.name}] SSL error: {str(e)}")
+            return (False, 'ssl', f'SSL certificate error: {str(e)}')
+        except OSError as e:
+            # Generic network errors (DNS, unreachable host, etc.)
+            if 'timed out' in str(e).lower():
+                logger.error(f"[{self.config.name}] Network timeout: {str(e)}")
+                return (False, 'timeout', 'Network timeout - check VPN or network connectivity')
+            elif 'no route to host' in str(e).lower() or 'unreachable' in str(e).lower():
+                logger.error(f"[{self.config.name}] Host unreachable: {str(e)}")
+                return (False, 'network', 'Host unreachable - check network or VPN connection')
+            else:
+                logger.error(f"[{self.config.name}] Network error: {str(e)}")
+                return (False, 'network', f'Network error: {str(e)}')
+        except Exception as e:
+            # Catch-all for unexpected errors
+            logger.error(f"[{self.config.name}] Unexpected error during connection: {str(e)}")
+            return (False, 'unknown', f'Unexpected error: {str(e)}')
 
     def disconnect(self):
         if self.si: 

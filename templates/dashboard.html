@@ -30,7 +30,7 @@
                 <label class="toggle-item">
                     <span>Autorefresh</span>
                     <div class="switch">
-                        <input type="checkbox" id="tasks-autorefresh" onchange="handleTasksConfigChange()">
+                        <input type="checkbox" id="tasks-autorefresh" onchange="handleTasksConfigChange()" checked>
                         <span class="slider"></span>
                     </div>
                 </label>
@@ -42,12 +42,12 @@
                     </div>
                 </label>
             </div>
-            <div id="tasks-toggle-icon" style="transition: transform 0.3s ease;">
+            <div id="tasks-toggle-icon" style="transition: transform 0.3s ease; transform: rotate(180deg);">
                 <i data-lucide="chevron-down"></i>
             </div>
         </div>
     </div>
-    <div id="tasks-table-content" style="display: none;" hx-get="/api/dashboard/tasks-table"
+    <div id="tasks-table-content" style="display: block;" hx-get="/api/dashboard/tasks-table"
         hx-trigger="load-tasks from:body" hx-swap="innerHTML">
         <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
             <div class="spinner-small" style="margin-bottom: 1rem;"></div>
@@ -240,5 +240,7 @@
     }
 
     lucide.createIcons();
+    // Initialize open panels
+    handleTasksConfigChange();
 </script>
 {% endblock %}

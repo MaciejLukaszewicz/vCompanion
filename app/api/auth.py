@@ -41,14 +41,32 @@ async def login(
         # This will unlock cache (derive key from password) and attempt connections
         connection_results = vcenter_manager.connect_all(username, password, vcenter_ids)
         
-        successful_connections = [vc_id for vc_id, success in connection_results.items() if success]
+        successful_connections = [vc_id for vc_id, result in connection_results.items() if result['success']]
+        failed_connections = {vc_id: result for vc_id, result in connection_results.items() if not result['success']}
         
         if not successful_connections:
+            # Analyze failures to provide helpful error message
+            error_types = [result['error_type'] for result in failed_connections.values()]
+            error_messages = [result['error_msg'] for result in failed_connections.values()]
+            
+            # Determine primary error type
+            if 'auth' in error_types:
+                error_msg = "Authentication failed. Please check your username and password."
+            elif 'timeout' in error_types or 'network' in error_types:
+                error_msg = "Connection failed. Please check your network connection or VPN."
+                if len(failed_connections) > 1:
+                    error_msg += f" ({len(failed_connections)} vCenter(s) unreachable)"
+            elif 'ssl' in error_types:
+                error_msg = "SSL certificate error. Please check vCenter SSL configuration."
+            else:
+                # Show first specific error message
+                error_msg = error_messages[0] if error_messages else "Could not connect to any vCenter."
+            
             return templates.TemplateResponse(
                 "login.html",
                 {
                     "request": request,
-                    "error": "Authentication failed. Could not connect to any vCenter. Check credentials.",
+                    "error": error_msg,
                     "vcenters": [{"id": vc.id, "name": vc.name, "host": vc.host} for vc in settings.vcenters]
                 }
             )
@@ -96,13 +114,26 @@ async def login_additional(
         # Connect additional (cache already unlocked)
         connection_results = vcenter_manager.connect_all(username, password, vcenter_ids)
         
-        successful_connections = [vc_id for vc_id, success in connection_results.items() if success]
+        successful_connections = [vc_id for vc_id, result in connection_results.items() if result['success']]
+        failed_connections = {vc_id: result for vc_id, result in connection_results.items() if not result['success']}
+        
         if successful_connections:
             set_connected_vcenters(request, successful_connections, merge=True)
+        
+        # Build error message if there were failures
+        error_msg = None
+        if failed_connections:
+            error_parts = []
+            for vc_id, result in failed_connections.items():
+                vc_name = next((vc.name for vc in settings.vcenters if vc.id == vc_id), vc_id)
+                error_parts.append(f"{vc_name}: {result['error_msg']}")
+            error_msg = "; ".join(error_parts)
         
         return JSONResponse({
             "success": len(successful_connections) > 0,
             "connected": successful_connections,
+            "failed": list(failed_connections.keys()),
+            "error": error_msg,
             "status": vcenter_manager.get_connection_status()
         })
         
