@@ -311,6 +311,12 @@
         const currentPort = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
 
         try {
+            window.isRestartingServer = true;
+            // Disable global health checks to prevent duplicate overlays or premature reloads
+            if (typeof isDisconnected !== 'undefined') isDisconnected = true;
+            const globalOverlay = document.getElementById('connection-lost-overlay');
+            if (globalOverlay) globalOverlay.style.display = 'none';
+
             // IF we are redirecting to a new port, we MUST save the settings first!
             if (withRedirect && newPort !== currentPort) {
                 const form = portInput.closest('form');
@@ -336,20 +342,22 @@
             overlay.className = 'connection-lost-overlay';
 
             let message = data.message;
-            let subtext = `Redirecting to dashboard in <span id="restart-countdown">5</span> seconds...`;
+            let subtext = `Redirecting to dashboard in <span id="restart-countdown">10</span> seconds...`;
 
             if (withRedirect && newPort !== currentPort) {
-                subtext = `Redirecting to <b>${window.location.hostname}:${newPort}</b> in <span id="restart-countdown">5</span> seconds...`;
+                subtext = `Redirecting to <b>${window.location.hostname}:${newPort}</b> in <span id="restart-countdown">10</span> seconds...`;
             }
 
             overlay.innerHTML = `
-                <div class="spinner"></div>
-                <h2>${message}</h2>
-                <p>${subtext}</p>
+                <div style="text-align: center; color: white;">
+                    <div class="spinner" style="margin: 0 auto 2rem auto;"></div>
+                    <h2 style="font-size: 2rem; margin-bottom: 1rem; color: white;">${message}</h2>
+                    <p style="font-size: 1.125rem; opacity: 0.9; color: white;">${subtext}</p>
+                </div>
             `;
             document.body.appendChild(overlay);
 
-            let count = 5;
+            let count = 10;
             const timer = setInterval(() => {
                 count--;
                 document.getElementById('restart-countdown').innerText = count;
@@ -379,12 +387,14 @@
             const overlay = document.createElement('div');
             overlay.className = 'connection-lost-overlay';
             overlay.innerHTML = `
-                <div style="color: var(--danger); margin-bottom: 2rem;"><i data-lucide="power" size="64"></i></div>
-                <h2>${data.message}</h2>
-                <p>The application is no longer running.</p>
-                <div style="margin-top: 2rem; display: flex; gap: 1rem;">
-                    <button onclick="window.close()" class="btn-primary">Close Browser Tab</button>
-                    <button onclick="location.reload()" class="btn-secondary">Retry Connection</button>
+                <div style="text-align: center; color: white;">
+                    <div style="color: var(--danger); margin-bottom: 2rem;"><i data-lucide="power" size="64"></i></div>
+                    <h2 style="font-size: 2rem; margin-bottom: 1rem; color: white;">${data.message}</h2>
+                    <p style="font-size: 1.125rem; opacity: 0.9; color: white;">The application is no longer running.</p>
+                    <div style="margin-top: 3rem; display: flex; gap: 1rem; justify-content: center;">
+                        <button onclick="window.close()" class="btn-primary" style="padding: 0.8rem 2rem;">Close Browser Tab</button>
+                        <button onclick="location.reload()" class="btn-secondary" style="padding: 0.8rem 2rem; border-color: white; color: white;">Retry Connection</button>
+                    </div>
                 </div>
             `;
             document.body.appendChild(overlay);
