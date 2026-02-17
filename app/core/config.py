@@ -14,7 +14,8 @@ class VCenterConfig(BaseModel):
 class AppSettings(BaseModel):
     title: str = "vCompanion"
     session_timeout: int = 3600
-    log_level: str = "INFO"
+    log_level: str = "ERROR"
+    log_to_file: bool = False
     refresh_interval_seconds: int = 120
     theme: str = "dark"  # "dark" or "light"
     accent_color: str = "blue"  # "blue", "purple", "emerald", "orange"
@@ -41,7 +42,7 @@ def load_config(path: str = None) -> Config:
             "app_settings": {
                 "title": "vCompanion",
                 "session_timeout": 3600,
-                "log_level": "INFO"
+                "log_level": "ERROR"
             },
             "vcenters": [
                 {

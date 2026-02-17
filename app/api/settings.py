@@ -187,6 +187,7 @@ async def update_application_settings(
     title: str = Form(...),
     refresh_interval_seconds: int = Form(...),
     log_level: str = Form(...),
+    log_to_file: bool = Form(False),
     theme: str = Form(...),
     accent_color: str = Form(...)
 ):
@@ -195,9 +196,14 @@ async def update_application_settings(
     settings.app_settings.title = title
     settings.app_settings.refresh_interval_seconds = refresh_interval_seconds
     settings.app_settings.log_level = log_level
+    settings.app_settings.log_to_file = log_to_file
     settings.app_settings.theme = theme
     settings.app_settings.accent_color = accent_color
     save_config(settings)
+    
+    # Update logging configuration dynamically
+    from main import configure_logging
+    configure_logging(settings.app_settings)
     
     # Update manager if needed
     if hasattr(request.app.state, 'vcenter_manager'):
@@ -235,6 +241,28 @@ async def update_security_settings(
         "request": request,
         "app_settings": settings.app_settings,
         "success_msg": "Security settings updated successfully."
+    })
+
+@router.post("/restart")
+async def restart_server(request: Request):
+    """Triggers a server restart by exiting with code 123."""
+    require_auth(request)
+    import os
+    import threading
+    import time
+
+    logger.error("!!! RESTART INITIATED BY USER !!!")
+    
+    def shutdown():
+        time.sleep(1)  # Give time for the response to reach the browser
+        # os._exit is used to bypass uvicorn's shutdown handlers and exit immediately
+        # with the code our run.bat is looking for.
+        os._exit(123)
+
+    threading.Thread(target=shutdown).start()
+    return JSONResponse({
+        "status": "ok", 
+        "message": "Restarting server..."
     })
 
 @router.post("/security/purge-cache")

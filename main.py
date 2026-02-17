@@ -2,6 +2,72 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
 import uvicorn
+import os
+import sys
+
+# 1. IMMEDIATE LOGGING CONFIGURATION
+# We define this first so we can capture all imports and early logs
+class ColorFormatter(logging.Formatter):
+    GREY = "\x1b[38;20m"
+    GREEN = "\x1b[32;20m"
+    YELLOW = "\x1b[33;20m"
+    RED = "\x1b[31;20m"
+    BOLD_RED = "\x1b[31;1m"
+    RESET = "\x1b[0m"
+    
+    LEVEL_COLORS = {
+        logging.DEBUG: GREY,
+        logging.INFO: GREEN,
+        logging.WARNING: YELLOW,
+        logging.ERROR: RED,
+        logging.CRITICAL: BOLD_RED
+    }
+
+    def format(self, record):
+        color = self.LEVEL_COLORS.get(record.levelno, "")
+        reset = self.RESET if color else ""
+        fmt = f"{color}%(levelname)s:{reset} %(asctime)s - %(name)s - %(message)s"
+        formatter = logging.Formatter(fmt)
+        return formatter.format(record)
+
+def configure_logging(app_settings=None):
+    from app.core.config import settings
+    level_name = app_settings.log_level if app_settings else settings.app_settings.log_level
+    log_to_file = app_settings.log_to_file if app_settings else settings.app_settings.log_to_file
+    level = getattr(logging, level_name.upper(), logging.INFO)
+    
+    root_logger = logging.getLogger()
+    for h in root_logger.handlers[:]:
+        root_logger.removeHandler(h)
+    
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(ColorFormatter())
+    root_logger.addHandler(console_handler)
+    
+    if log_to_file:
+        file_handler = logging.FileHandler("log.txt")
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        root_logger.addHandler(file_handler)
+    
+    root_logger.setLevel(level)
+    
+    for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access", "fastapi", "watchfiles"]:
+        l = logging.getLogger(logger_name)
+        l.setLevel(level)
+        l.propagate = True 
+        for h in l.handlers[:]:
+            l.removeHandler(h)
+
+    # Always show startup success in GREEN
+    orig_level = root_logger.level
+    root_logger.setLevel(logging.INFO)
+    logging.getLogger("vCompanion").info("Application started successfully")
+    root_logger.setLevel(orig_level)
+
+# Run initial config
+from app.core.config import settings
+configure_logging()
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -12,28 +78,16 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import auth, dashboard, vcenters, inventory, settings as settings_api
 from app.core.session import is_authenticated
-from app.core.config import settings
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    logger.info("vCompanion starting up...")
-    # Ensure vcenter_manager exists from the start
+    # Startup tasks
     from app.services.vcenter_service import VCenterManager
     app.state.vcenter_manager = VCenterManager(settings.vcenters)
     yield
-    # Shutdown
+    # Shutdown tasks
     if hasattr(app.state, 'vcenter_manager'):
-        logger.info("Stopping background worker and locking cache...")
         app.state.vcenter_manager.disconnect_all()
-    logger.info("vCompanion shutting down...")
 
 app = FastAPI(
     title=settings.app_settings.title,
@@ -263,4 +317,4 @@ if __name__ == "__main__":
     # IMPORTANT: If you are using --reload, exclude the 'data' directory to prevent 
     # the server from restarting every time the encrypted cache is saved!
     # CLI: uvicorn main:app --reload --reload-exclude "data/*"
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False, log_config=None)
