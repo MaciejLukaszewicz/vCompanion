@@ -19,6 +19,8 @@ class AppSettings(BaseModel):
     refresh_interval_seconds: int = 120
     theme: str = "dark"  # "dark" or "light"
     accent_color: str = "blue"  # "blue", "purple", "emerald", "orange"
+    port: int = 8000
+    open_browser_on_start: bool = True
 
 class Config(BaseModel):
     app_settings: AppSettings = AppSettings()
@@ -42,7 +44,8 @@ def load_config(path: str = None) -> Config:
             "app_settings": {
                 "title": "vCompanion",
                 "session_timeout": 3600,
-                "log_level": "ERROR"
+                "log_level": "ERROR",
+                "port": 8000
             },
             "vcenters": [
                 {

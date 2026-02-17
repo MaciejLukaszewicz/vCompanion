@@ -189,7 +189,9 @@ async def update_application_settings(
     log_level: str = Form(...),
     log_to_file: bool = Form(False),
     theme: str = Form(...),
-    accent_color: str = Form(...)
+    accent_color: str = "blue",
+    port: int = Form(8000),
+    open_browser_on_start: bool = Form(True)
 ):
     """Updates global application settings."""
     require_auth(request)
@@ -199,6 +201,8 @@ async def update_application_settings(
     settings.app_settings.log_to_file = log_to_file
     settings.app_settings.theme = theme
     settings.app_settings.accent_color = accent_color
+    settings.app_settings.port = port
+    settings.app_settings.open_browser_on_start = open_browser_on_start
     save_config(settings)
     
     # Update logging configuration dynamically
@@ -263,6 +267,26 @@ async def restart_server(request: Request):
     return JSONResponse({
         "status": "ok", 
         "message": "Restarting server..."
+    })
+
+@router.post("/shutdown")
+async def shutdown_server(request: Request):
+    """Triggers a server shutdown by exiting with code 0."""
+    require_auth(request)
+    import os
+    import threading
+    import time
+
+    logger.error("!!! SHUTDOWN INITIATED BY USER !!!")
+    
+    def shutdown():
+        time.sleep(1)
+        os._exit(0)  # Exit code 0 means normal shutdown (loop stops)
+
+    threading.Thread(target=shutdown).start()
+    return JSONResponse({
+        "status": "ok", 
+        "message": "Server is shutting down. You can close this window."
     })
 
 @router.post("/security/purge-cache")

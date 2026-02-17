@@ -61,7 +61,10 @@ def configure_logging(app_settings=None):
     # Always show startup success in GREEN
     orig_level = root_logger.level
     root_logger.setLevel(logging.INFO)
-    logging.getLogger("vCompanion").info("Application started successfully")
+    port = app_settings.port if app_settings else settings.app_settings.port
+    # Note: We assume http as default local dev
+    url = f"http://localhost:{port}"
+    logging.getLogger("vCompanion").info(f"Application started successfully and running at {url}")
     root_logger.setLevel(orig_level)
 
 # Run initial config
@@ -317,4 +320,4 @@ if __name__ == "__main__":
     # IMPORTANT: If you are using --reload, exclude the 'data' directory to prevent 
     # the server from restarting every time the encrypted cache is saved!
     # CLI: uvicorn main:app --reload --reload-exclude "data/*"
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False, log_config=None)
+    uvicorn.run("main:app", host="127.0.0.1", port=settings.app_settings.port, reload=False, log_config=None)
