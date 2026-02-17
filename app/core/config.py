@@ -9,6 +9,7 @@ class VCenterConfig(BaseModel):
     host: str
     port: int = 443
     verify_ssl: bool = False
+    enabled: bool = True
     refresh_interval: Optional[int] = None
 
 class AppSettings(BaseModel):

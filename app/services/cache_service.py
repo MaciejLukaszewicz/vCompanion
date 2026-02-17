@@ -7,6 +7,7 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from app.core.config import settings
 
 # Try to import pyVmomi for type checking
 try:
@@ -48,6 +49,11 @@ class CacheService:
             self.salt = self.salt_path.read_bytes()
         self._fernet = None
         self._is_unlocked = False
+
+    @property
+    def enabled_vc_ids(self) -> set:
+        """Helper to get set of IDs for currently enabled vCenters."""
+        return {vc.id for vc in settings.vcenters if vc.enabled}
 
     def derive_key(self, password: str) -> bool:
         try:
@@ -106,7 +112,8 @@ class CacheService:
 
     def get_vcenter_status(self, vc_id: str = None):
         if vc_id: return self._data["vcenters"].get(vc_id)
-        return list(self._data["vcenters"].values())
+        enabled_ids = self.enabled_vc_ids
+        return [v for vid, v in self._data["vcenters"].items() if vid in enabled_ids]
 
     def save_vms(self, vcenter_id: str, vms: list):
         if not self._is_unlocked: return
@@ -140,29 +147,43 @@ class CacheService:
 
     def get_all_vms(self):
         all_vms = []
-        for vms in self._data["vms"].values(): all_vms.extend(vms)
+        enabled_ids = self.enabled_vc_ids
+        for vc_id, vms in self._data["vms"].items():
+            if vc_id in enabled_ids:
+                all_vms.extend(vms)
         return all_vms
 
     def get_all_hosts(self):
         all_hosts = []
-        for hosts in self._data["hosts"].values(): all_hosts.extend(hosts)
+        enabled_ids = self.enabled_vc_ids
+        for vc_id, hosts in self._data["hosts"].items():
+            if vc_id in enabled_ids:
+                all_hosts.extend(hosts)
         return all_hosts
 
     def get_all_alerts(self):
         all_alerts = []
-        for alerts in self._data["alerts"].values(): all_alerts.extend(alerts)
+        enabled_ids = self.enabled_vc_ids
+        for vc_id, alerts in self._data["alerts"].items():
+            if vc_id in enabled_ids:
+                all_alerts.extend(alerts)
         return all_alerts
 
     def get_all_clusters(self):
         all_clusters = []
-        for clusters in self._data["clusters"].values(): all_clusters.extend(clusters)
+        enabled_ids = self.enabled_vc_ids
+        for vc_id, clusters in self._data["clusters"].items():
+            if vc_id in enabled_ids:
+                all_clusters.extend(clusters)
         return all_clusters
 
     def get_all_networks(self):
-        return self._data["networks"]
+        enabled_ids = self.enabled_vc_ids
+        return {vc_id: nets for vc_id, nets in self._data["networks"].items() if vc_id in enabled_ids}
 
     def get_all_storage(self):
-        return self._data.get("storage", {})
+        enabled_ids = self.enabled_vc_ids
+        return {vc_id: storage for vc_id, storage in self._data["storage"].items() if vc_id in enabled_ids}
 
     def get_cached_stats(self):
         vms = self.get_all_vms()
@@ -183,13 +204,16 @@ class CacheService:
             return {"total_vms": "N/A", "has_data": False, "raw_alerts": []}
         
         per_vcenter = {}
+        enabled_ids = self.enabled_vc_ids
         for vc_id, status in self._data["vcenters"].items():
-            per_vcenter[vc_id] = {
-                "name": status.get('name'), 
-                "connected": status.get('status') == 'READY', 
-                "vms": 0, "vms_on": 0, "hosts": 0, "snapshots": 0,
-                "critical": 0, "warning": 0
-            }
+            # Only include enabled vCenters in stats breakdown
+            if vc_id in enabled_ids:
+                per_vcenter[vc_id] = {
+                    "name": status.get('name'), 
+                    "connected": status.get('status') == 'READY', 
+                    "vms": 0, "vms_on": 0, "hosts": 0, "snapshots": 0,
+                    "critical": 0, "warning": 0
+                }
         
         for vm in vms:
             vc_id = vm.get('vcenter_id')

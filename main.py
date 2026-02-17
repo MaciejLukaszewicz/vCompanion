@@ -140,7 +140,7 @@ def get_vcenter_status(request: Request):
     return [{
         "id": vc.id, "name": vc.name, "host": vc.host, "connected": vc.id in connected_ids,
         "refresh_status": "READY", "unlocked": False
-    } for vc in settings.vcenters]
+    } for vc in settings.vcenters if vc.enabled]
 
 @app.api_route("/login", methods=["GET", "HEAD"])
 async def login_page(request: Request):
@@ -150,7 +150,7 @@ async def login_page(request: Request):
     
     return templates.TemplateResponse("login.html", {
         "request": request,
-        "vcenters": [{"id": vc.id, "name": vc.name, "host": vc.host} for vc in settings.vcenters]
+        "vcenters": [{"id": vc.id, "name": vc.name, "host": vc.host} for vc in settings.vcenters if vc.enabled]
     })
 
 @app.get("/")

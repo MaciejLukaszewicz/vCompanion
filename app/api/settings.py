@@ -26,6 +26,7 @@ async def add_vcenter(
     host: str = Form(...),
     port: int = Form(443),
     verify_ssl: bool = Form(False),
+    enabled: bool = Form(False),
     refresh_interval: int = Form(None)
 ):
     """Adds a new vCenter to the configuration."""
@@ -40,6 +41,7 @@ async def add_vcenter(
         host=host,
         port=port,
         verify_ssl=verify_ssl,
+        enabled=enabled,
         refresh_interval=refresh_interval
     )
     
@@ -125,6 +127,7 @@ async def update_vcenter(
     host: str = Form(...),
     port: int = Form(443),
     verify_ssl: bool = Form(False),
+    enabled: bool = Form(False),
     refresh_interval: int = Form(None)
 ):
     """Updates an existing vCenter configuration."""
@@ -140,6 +143,7 @@ async def update_vcenter(
         host=host,
         port=port,
         verify_ssl=verify_ssl,
+        enabled=enabled,
         refresh_interval=refresh_interval
     )
     

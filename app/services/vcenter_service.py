@@ -14,14 +14,15 @@ logger = logging.getLogger(__name__)
 
 class VCenterManager:
     def __init__(self, configs: list[VCenterConfig]):
-        self.configs = configs
-        self.connections = {cfg.id: VCenterConnection(cfg) for cfg in configs}
+        # Filter only enabled vCenters
+        self.configs = [cfg for cfg in configs if cfg.enabled]
+        self.connections = {cfg.id: VCenterConnection(cfg) for cfg in self.configs}
         self.cache = cache_service
         self.global_refresh_interval = settings.app_settings.refresh_interval_seconds
         self._stop_event = threading.Event()
         self._worker_thread = None
-        self._last_refresh_trigger = {cfg.id: 0 for cfg in configs}
-        logger.info(f"VCenterManager initialized with {len(self.connections)} vCenters")
+        self._last_refresh_trigger = {cfg.id: 0 for cfg in self.configs}
+        logger.info(f"VCenterManager initialized with {len(self.connections)} enabled vCenters (out of {len(configs)} total)")
 
     def start_worker(self):
         if not self.cache.is_unlocked(): return

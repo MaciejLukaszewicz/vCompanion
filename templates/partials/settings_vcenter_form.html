@@ -26,13 +26,27 @@
         </div>
     </div>
 
-    <div class="checkbox-group"
-        style="padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;">
-        <input type="checkbox" name="verify_ssl" id="v_ssl_edit" {{ 'checked' if vc and vc.verify_ssl else '' }}>
-        <label for="v_ssl_edit"
-            style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
-            <i data-lucide="shield-check" size="16"></i> Verify SSL Certificate
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <label class="checkbox-group" for="v_enabled_edit"
+            style="padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin: 0;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+                <i data-lucide="power" size="16"></i> Enabled
+            </div>
+            <div class="switch">
+                <input type="checkbox" name="enabled" id="v_enabled_edit" {{ 'checked' if (not vc or vc.enabled) else ''
+                    }}>
+                <span class="slider"></span>
+            </div>
         </label>
+
+        <div class="checkbox-group"
+            style="padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" name="verify_ssl" id="v_ssl_edit" {{ 'checked' if vc and vc.verify_ssl else '' }}>
+            <label for="v_ssl_edit"
+                style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+                <i data-lucide="shield-check" size="16"></i> Verify SSL
+            </label>
+        </div>
     </div>
 
     <div

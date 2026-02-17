@@ -40,6 +40,10 @@
                     <div style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="clock" size="14"></i>
                         Interval</div>
                 </th>
+                <th>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="power" size="14"></i>
+                        Status</div>
+                </th>
                 <th style="text-align: right;">Actions</th>
             </tr>
         </thead>
@@ -63,6 +67,15 @@
                     {% endif %}
                 </td>
                 <td>{{ vc.refresh_interval or 'Auto' }}s</td>
+                <td>
+                    {% if vc.enabled %}
+                    <span
+                        style="color: var(--success); background: rgba(var(--success-rgb), 0.1); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(var(--success-rgb), 0.2);">ENABLED</span>
+                    {% else %}
+                    <span
+                        style="color: var(--text-dim); background: rgba(255, 255, 255, 0.05); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border);">DISABLED</span>
+                    {% endif %}
+                </td>
                 <td style="text-align: right;">
                     <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
                         <button class="btn-icon" onclick="openEditVcenterModal('{{ vc.id }}')"
@@ -80,7 +93,7 @@
             {% endfor %}
             {% if not vcenters %}
             <tr>
-                <td colspan="6" style="text-align: center; padding: 4rem 2rem; color: var(--text-dim);">
+                <td colspan="7" style="text-align: center; padding: 4rem 2rem; color: var(--text-dim);">
                     <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
                         <div style="background: rgba(var(--primary-rgb), 0.1); padding: 1rem; border-radius: 50%;">
                             <i data-lucide="server-off" size="32" style="color: var(--primary);"></i>
