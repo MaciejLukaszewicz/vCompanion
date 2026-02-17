@@ -7,7 +7,7 @@
 
 <form hx-post="/api/settings/application/update" hx-target="#settings-content-area" class="vcompanion-form">
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-        <!-- Left Side: Basic Info -->
+        <!-- Left Side: Basic Info & Actions -->
         <div style="display: flex; flex-direction: column; gap: 1.5rem;">
             <div class="form-group">
                 <label><i data-lucide="tag" size="16"></i> Application Title</label>
@@ -24,37 +24,7 @@
                     worker updates vCenter data.</p>
             </div>
 
-            <div class="form-group">
-                <label><i data-lucide="file-text" size="16"></i> System Log Level</label>
-                <select name="log_level" class="form-select">
-                    <option value="DEBUG" {% if app_settings.log_level=='DEBUG' %}selected{% endif %}>DEBUG (Most
-                        verbose)</option>
-                    <option value="INFO" {% if app_settings.log_level=='INFO' %}selected{% endif %}>INFO (Standard)
-                    </option>
-                    <option value="ERROR" {% if app_settings.log_level=='ERROR' %}selected{% endif %}>ERROR (Errors
-                        only)
-                    </option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label><i data-lucide="file-output" size="16"></i> Logging Destinations</label>
-                <div class="toggle-group"
-                    style="padding: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 12px;">
-                    <label class="toggle-item" style="flex: 1; justify-content: space-between;">
-                        <span style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
-                            Save logs to file (log.txt)
-                        </span>
-                        <div class="switch">
-                            <input type="checkbox" name="log_to_file" id="log_to_file" {{ 'checked' if
-                                app_settings.log_to_file else '' }}>
-                            <span class="slider"></span>
-                        </div>
-                    </label>
-                </div>
-            </div>
-
-            <div class="form-group" style="margin-top: 1rem;">
+            <div class="form-group" style="margin-top: 1rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
                 <label><i data-lucide="power" size="16"></i> System Actions</label>
                 <button type="button" class="btn-secondary"
                     style="width: 100%; border-color: var(--danger); color: var(--danger); display: flex; align-items: center; justify-content: center; gap: 0.5rem;"
@@ -67,36 +37,75 @@
             </div>
         </div>
 
-        <!-- Right Side: Appearance -->
-        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-            <div class="form-group">
-                <label><i data-lucide="palette" size="16"></i> Color Mode (Theme)</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
-                    <label class="theme-option {% if app_settings.theme == 'dark' %}active{% endif %}">
-                        <input type="radio" name="theme" value="dark" {% if app_settings.theme=='dark' %}checked{% endif
-                            %} style="display: none;">
-                        <i data-lucide="moon"></i> Dark Mode
-                    </label>
-                    <label class="theme-option {% if app_settings.theme == 'light' %}active{% endif %}">
-                        <input type="radio" name="theme" value="light" {% if app_settings.theme=='light' %}checked{%
-                            endif %} style="display: none;">
-                        <i data-lucide="sun"></i> Light Mode
-                    </label>
+        <!-- Right Side: Appearance & Logging -->
+        <div style="display: flex; flex-direction: column; gap: 2.5rem;">
+            <!-- Appearance Group -->
+            <div class="settings-section">
+                <h3 class="section-header"><i data-lucide="layout" size="14"></i> Appearance</h3>
+
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label>Color Mode (Theme)</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
+                        <label class="theme-option {% if app_settings.theme == 'dark' %}active{% endif %}">
+                            <input type="radio" name="theme" value="dark" {% if app_settings.theme=='dark' %}checked{%
+                                endif %} style="display: none;">
+                            <i data-lucide="moon"></i> Dark Mode
+                        </label>
+                        <label class="theme-option {% if app_settings.theme == 'light' %}active{% endif %}">
+                            <input type="radio" name="theme" value="light" {% if app_settings.theme=='light' %}checked{%
+                                endif %} style="display: none;">
+                            <i data-lucide="sun"></i> Light Mode
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Accent Color</label>
+                    <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                        {% for color in ['blue', 'purple', 'emerald', 'orange'] %}
+                        <label
+                            class="color-pill color-{{ color }} {% if app_settings.accent_color == color %}active{% endif %}"
+                            title="{{ color|capitalize }}">
+                            <input type="radio" name="accent_color" value="{{ color }}" {% if
+                                app_settings.accent_color==color %}checked{% endif %} style="display: none;">
+                            <div class="color-dot"></div>
+                        </label>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 
-            <div class="form-group">
-                <label><i data-lucide="droplet" size="16"></i> Accent Color</label>
-                <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
-                    {% for color in ['blue', 'purple', 'emerald', 'orange'] %}
-                    <label
-                        class="color-pill color-{{ color }} {% if app_settings.accent_color == color %}active{% endif %}"
-                        title="{{ color|capitalize }}">
-                        <input type="radio" name="accent_color" value="{{ color }}" {% if
-                            app_settings.accent_color==color %}checked{% endif %} style="display: none;">
-                        <div class="color-dot"></div>
-                    </label>
-                    {% endfor %}
+            <!-- Logging Group -->
+            <div class="settings-section">
+                <h3 class="section-header"><i data-lucide="list-todo" size="14"></i> Logging</h3>
+
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label>System Log Level</label>
+                    <select name="log_level" class="form-select">
+                        <option value="DEBUG" {% if app_settings.log_level=='DEBUG' %}selected{% endif %}>DEBUG (Most
+                            verbose)</option>
+                        <option value="INFO" {% if app_settings.log_level=='INFO' %}selected{% endif %}>INFO (Standard)
+                        </option>
+                        <option value="ERROR" {% if app_settings.log_level=='ERROR' %}selected{% endif %}>ERROR (Errors
+                            only)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Save log to file</label>
+                    <div class="toggle-group"
+                        style="padding: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; margin-top: 0.5rem;">
+                        <label class="toggle-item" style="flex: 1; justify-content: space-between;">
+                            <span style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+                                Enable log.txt output
+                            </span>
+                            <div class="switch">
+                                <input type="checkbox" name="log_to_file" id="log_to_file" {{ 'checked' if
+                                    app_settings.log_to_file else '' }}>
+                                <span class="slider"></span>
+                            </div>
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -116,6 +125,24 @@
 </form>
 
 <style>
+    .section-header {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-main);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        border-bottom: 2px solid var(--border);
+        padding-bottom: 0.6rem;
+    }
+
+    .section-header i {
+        color: var(--primary);
+    }
+
     .form-select {
         background: var(--bg);
         border: 1px solid var(--border);
