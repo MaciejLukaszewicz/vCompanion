@@ -227,7 +227,7 @@
                         <span class="label">{{ nic.label }}</span>
                         <i data-lucide="link" size="18"></i>
                         <span class="value"
-                            style="font-family: monospace; font-size: 0.75rem; color: {{ 'var(--success)' if nic.connected else 'var(--text-dim)' }}">{{
+                            style="font-family: monospace; font-size: 0.75rem; color: {{ 'var(--text-main)' if nic.connected else 'var(--text-dim)' }}">{{
                             nic.mac }}</span>
                         {% if not nic.connected %}<span class="type-badge"
                             style="background: var(--danger);">Disconnected</span>{% endif %}
@@ -268,8 +268,18 @@
                         <span class="label">Physical Uplinks</span>
                         <div class="uplink-container">
                             {% for up in nic.uplinks %}
-                            <div class="uplink-tag"><i data-lucide="cpu" size="10"
-                                    style="margin-right: 2px; vertical-align: middle;"></i>{{ up }}</div>
+                            <div class="uplink-tag"
+                                style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0.35rem 0.65rem;">
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <i data-lucide="cpu" size="10"></i>
+                                    <span>{% if up is mapping %}{{ up.device }}{% else %}{{ up }}{% endif %}</span>
+                                </div>
+                                {% if up is mapping %}
+                                <div
+                                    style="font-size: 0.6rem; font-family: monospace; color: var(--text-main); font-weight: 500;">
+                                    {{ up.mac }}</div>
+                                {% endif %}
+                            </div>
                             {% endfor %}
                             {% if not nic.uplinks %}
                             <span style="font-size: 0.75rem; color: var(--text-dim); font-style: italic;">No

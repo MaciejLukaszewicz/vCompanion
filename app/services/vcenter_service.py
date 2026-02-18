@@ -847,15 +847,15 @@ class VCenterConnection:
                 for obj in props:
                     p_dict = {p.name: p.val for p in obj.propSet}
                     
-                    # Map pNIC keys to device names for this host
-                    pnic_map = {p.key: p.device for p in p_dict.get("config.network.pnic", [])}
+                    # Map pNIC keys to device names and MACs for this host
+                    pnic_map = {p.key: {"device": p.device, "mac": p.mac} for p in p_dict.get("config.network.pnic", [])}
                     
                     switches = []
                     for vss in p_dict.get("config.network.vswitch", []):
                         switches.append({
                             "name": vss.name,
                             "type": "standard",
-                            "uplinks": [pnic_map.get(u, u) for u in (vss.pnic or [])],
+                            "uplinks": [pnic_map.get(u) for u in (vss.pnic or []) if u in pnic_map],
                             "portgroups": vss.portgroup or []
                         })
                     
@@ -863,7 +863,7 @@ class VCenterConnection:
                         switches.append({
                             "name": ps.dvsName,
                             "type": "distributed",
-                            "uplinks": [pnic_map.get(pnic, pnic) for pnic in (ps.pnic or [])],
+                            "uplinks": [pnic_map.get(pnic) for pnic in (ps.pnic or []) if pnic in pnic_map],
                             "dvs_uuid": ps.dvsUuid
                         })
 
