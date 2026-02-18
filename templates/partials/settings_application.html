@@ -58,8 +58,9 @@
                                 Open browser on start
                             </span>
                             <div class="switch">
+                                <input type="hidden" name="open_browser_on_start" value="false">
                                 <input type="checkbox" name="open_browser_on_start" id="open_browser_on_start"
-                                    {{ 'checked' if app_settings.open_browser_on_start else '' }}>
+                                    value="true" {{ 'checked' if app_settings.open_browser_on_start else '' }}>
                                 <span class="slider"></span>
                             </div>
                         </label>
@@ -153,7 +154,8 @@
                                 Enable log.txt output
                             </span>
                             <div class="switch">
-                                <input type="checkbox" name="log_to_file" id="log_to_file" {{ 'checked' if
+                                <input type="hidden" name="log_to_file" value="false">
+                                <input type="checkbox" name="log_to_file" id="log_to_file" value="true" {{ 'checked' if
                                     app_settings.log_to_file else '' }}>
                                 <span class="slider"></span>
                             </div>

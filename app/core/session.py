@@ -28,9 +28,11 @@ def is_authenticated(request: Request) -> bool:
             timeout = settings.app_settings.session_timeout
             if datetime.now() - last_activity_time > timedelta(seconds=timeout):
                 logger.info(f"Session for user '{username}' expired due to inactivity ({timeout}s)")
+                request.session.clear()  # Invalidate stale cookie immediately
                 return False
         except Exception as e:
             logger.error(f"Error parsing session activity for '{username}': {e}")
+            request.session.clear()
             return False
     
     # In Zero-Password-Storage, session is only valid if server has the manager and cache is unlocked

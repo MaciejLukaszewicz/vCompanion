@@ -191,14 +191,20 @@ async def update_application_settings(
     title: str = Form(...),
     refresh_interval_seconds: int = Form(...),
     log_level: str = Form(...),
-    log_to_file: bool = Form(False),
     theme: str = Form(...),
-    accent_color: str = "blue",
+    accent_color: str = Form("blue"),
     port: int = Form(8000),
-    open_browser_on_start: bool = Form(True)
 ):
     """Updates global application settings."""
     require_auth(request)
+
+    # Read raw form data to correctly handle checkbox fields.
+    # Checkboxes send nothing when unchecked, so we use a hidden field with value="false"
+    # followed by the checkbox with value="true". We check if "true" appears in the values list.
+    form_data = await request.form()
+    log_to_file = "true" in form_data.getlist("log_to_file")
+    open_browser_on_start = "true" in form_data.getlist("open_browser_on_start")
+
     settings.app_settings.title = title
     settings.app_settings.refresh_interval_seconds = refresh_interval_seconds
     settings.app_settings.log_level = log_level
