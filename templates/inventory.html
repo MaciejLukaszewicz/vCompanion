@@ -28,12 +28,17 @@
                     hx-get="/api/inventory/vms" hx-target="#vm-list-target"
                     hx-trigger="change, keyup delay:300ms from:#vm-search">
 
+                    <!-- Hidden inputs to preserve selection state -->
+                    <input type="hidden" name="selected_vm_id" id="selected-vm-id">
+                    <input type="hidden" name="selected_vcenter_id" id="selected-vcenter-id">
+
                     <!-- Global Search -->
                     <div style="position: relative; flex: 1;">
                         <i data-lucide="search" size="14"
                             style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-dim);"></i>
                         <input type="text" id="vm-search" name="q"
                             placeholder="Search by Name, IP, vCenter, Host, Snapshot..."
+                            onfocus="window.isSearchFocused = true" onblur="window.isSearchFocused = false"
                             style="width: 100%; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 2.5rem 0.4rem 2.25rem; font-size: 0.85rem; color: var(--text-main);">
                         <!-- Clear Search Button -->
                         <div id="clear-search" onclick="clearVmSearch()"
@@ -66,10 +71,12 @@
             </div>
         </div>
 
-        <div id="vms-content" style="display: flex; height: 600px; border-top: none;">
+        <div id="vms-content" style="display: flex; height: 600px; border-top: none; min-height: 600px;">
             <!-- Left Side: VM List -->
-            <div class="inventory-list-pane" style="flex: 1; border-right: 1px solid var(--border); overflow-y: auto;">
-                <div id="vm-list-target" hx-get="/api/inventory/vms" hx-trigger="load, vcenter-refreshed from:body">
+            <div class="inventory-list-pane" id="vm-list-pane"
+                style="flex: 1; border-right: 1px solid var(--border); overflow-y: auto; position: relative; transition: all 0.3s ease;">
+                <div id="vm-list-target" hx-get="/api/inventory/vms" hx-include="#vm-filters"
+                    hx-trigger="load, vcenter-refreshed[!window.isSearchFocused] from:body">
                     <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
                         <div class="spinner-small" style="margin-bottom: 1rem;"></div>
                         Loading virtual machines...
@@ -77,15 +84,24 @@
                 </div>
             </div>
 
+            <!-- Collapse Toggle Button -->
+            <div class="pane-toggle-btn" onclick="togglePaneCollapse()" id="vm-pane-toggle" title="Toggle Sidebar">
+                <i data-lucide="chevron-left" id="toggle-icon"></i>
+            </div>
+
             <!-- Right Side: VM Details -->
             <div class="inventory-details-pane" id="vm-details-panel"
-                style="flex: 1.2; background: rgba(0,0,0,0.1); overflow-y: auto;">
+                style="flex: 1.2; background: rgba(0,0,0,0.1); overflow-y: auto; transition: all 0.3s ease;">
                 <div
                     style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); padding: 2rem; text-align: center;">
                     <i data-lucide="info" size="48" style="margin-bottom: 1rem; opacity: 0.2;"></i>
                     <p>Select a virtual machine to view detailed information, networks, and snapshots.</p>
                 </div>
             </div>
+        </div>
+        <!-- Horizontal Resizer -->
+        <div id="vms-resizer" class="horizontal-resizer" title="Drag down to expand VM list">
+            <div class="resizer-handle-h"></div>
         </div>
     </section>
 
@@ -379,6 +395,82 @@
         animation: spin 1s linear infinite;
         margin: 0 auto;
     }
+
+    /* Pane Toggle Button Style */
+    .pane-toggle-btn {
+        width: 32px;
+        height: 32px;
+        background: #ffffff !important;
+        border: 1px solid var(--border);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        margin-left: -16px;
+        margin-right: -16px;
+        z-index: 100;
+        top: 25px;
+        /* Positioned near the header */
+        color: #1e293b;
+        /* Dark icon */
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .pane-toggle-btn:hover {
+        color: var(--primary);
+        border-color: var(--primary);
+        transform: scale(1.1);
+    }
+
+    /* Collapse states */
+    #vm-list-pane.is-collapsed {
+        flex: 0 0 250px !important;
+    }
+
+    #vm-list-pane.is-collapsed .hidable {
+        display: none !important;
+    }
+
+    #vm-list-pane.is-collapsed th {
+        width: 100% !important;
+    }
+
+    /* Horizontal Resizer */
+    .horizontal-resizer {
+        height: 10px;
+        background: transparent;
+        cursor: row-resize;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-top: 1px solid var(--border);
+        transition: all 0.2s;
+        user-select: none;
+    }
+
+    .horizontal-resizer:hover {
+        background: rgba(var(--primary-rgb), 0.05);
+    }
+
+    .horizontal-resizer.is-resizing {
+        background: rgba(var(--primary-rgb), 0.1) !important;
+    }
+
+    .resizer-handle-h {
+        width: 48px;
+        height: 4px;
+        background: var(--border);
+        border-radius: 2px;
+        transition: all 0.2s;
+    }
+
+    .horizontal-resizer:hover .resizer-handle-h {
+        width: 64px;
+        background: var(--primary);
+    }
 </style>
 {% endblock %}
 
@@ -403,6 +495,10 @@
         if (vmRow) {
             document.querySelectorAll('.vm-row').forEach(r => r.classList.remove('selected'));
             vmRow.classList.add('selected');
+
+            // Sync hidden inputs for refresh preservation
+            document.getElementById('selected-vm-id').value = vmRow.getAttribute('data-vm-id');
+            document.getElementById('selected-vcenter-id').value = vmRow.getAttribute('data-vcenter-id');
         }
         const hostRow = e.target.closest('.host-row');
         if (hostRow) {
@@ -476,5 +572,78 @@
             icon.style.pointerEvents = 'auto';
         }, 2000);
     }
+
+    function togglePaneCollapse() {
+        const pane = document.getElementById('vm-list-pane');
+        const details = document.getElementById('vm-details-panel');
+        const icon = document.getElementById('toggle-icon');
+
+        const isCollapsed = pane.classList.toggle('is-collapsed');
+
+        if (isCollapsed) {
+            details.style.flex = "2";
+            icon.setAttribute('data-lucide', 'chevron-right');
+        } else {
+            details.style.flex = "1.2";
+            icon.setAttribute('data-lucide', 'chevron-left');
+        }
+
+        // Re-render Lucide icons
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    // VM Panel Resizing Logic
+    function initInventoryResizers() {
+        const resizer = document.getElementById('vms-resizer');
+        const content = document.getElementById('vms-content');
+
+        if (!resizer || !content) return;
+
+        // Load saved height
+        const savedHeight = localStorage.getItem('vms-panel-height');
+        if (savedHeight) {
+            content.style.height = savedHeight + 'px';
+        }
+
+        let startY, startHeight;
+
+        resizer.addEventListener('mousedown', function (e) {
+            startY = e.clientY;
+            startHeight = parseInt(document.defaultView.getComputedStyle(content).height, 10);
+            resizer.classList.add('is-resizing');
+
+            // Global overlay classes or just use document events
+            document.body.style.cursor = 'row-resize';
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+
+            e.preventDefault();
+        });
+
+        function onMouseMove(e) {
+            const delta = e.clientY - startY;
+            const newHeight = Math.max(600, startHeight + delta); // Min height 600
+            content.style.height = newHeight + 'px';
+        }
+
+        function onMouseUp() {
+            resizer.classList.remove('is-resizing');
+            document.body.style.cursor = 'default';
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+
+            // Save preferred height
+            localStorage.setItem('vms-panel-height', parseInt(content.style.height));
+        }
+    }
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', () => {
+        window.isSearchFocused = false;
+        initInventoryResizers();
+    });
 </script>
 {% endblock %}

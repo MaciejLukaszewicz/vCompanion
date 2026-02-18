@@ -1,0 +1,55 @@
+# Szybkie komendy
+1. Stworzenie gałęzi i wypchnięcie na github
+```powershell
+git switch -c feature/moje-ulepszenie  
+git push origin feature/moje-ulepszenie
+```
+
+2. przełącz się na gałąź
+```powershell
+git switch feature/moje-ulepszenie
+```
+
+3. Usuwanie wskaźników remote z gałęzi
+```powershell
+git fetch --prune
+```
+
+# 🚀 Zasady pracy nad projektem
+
+Aby utrzymać porządek w kodzie i jasną historię zmian, w tym projekcie stosujemy poniższe zasady dotyczące gałęzi, wersji oraz wydań (releases).
+
+---
+
+## 🌿 Zarządzanie gałęziami (Branching)
+
+Stosujemy uproszczony model oparty na przedrostkach. **Nigdy nie pushujemy zmian bezpośrednio do gałęzi `main`.** Każda zmiana musi przejść przez Pull Request.
+
+### Nazewnictwo gałęzi:
+| Przedrostek | Przeznaczenie | Przykład |
+| :--- | :--- | :--- |
+| `feature/` | Nowe funkcjonalności i opcje | `feature/add-login-page` |
+| `bugfix/` | Naprawa błędów w kodzie | `bugfix/fix-header-spacing` |
+| `docs/` | Zmiany w dokumentacji, README | `docs/update-installation` |
+| `refactor/` | Zmiana struktury kodu bez zmiany działania | `refactor/api-logic` |
+| `hotfix/` | Pilne poprawki krytycznych błędów w wydaniu | `hotfix/security-fix` |
+
+### Proces pracy:
+1. Przełącz się na `main` i pobierz zmiany: `git switch main` -> `git pull origin main`.
+2. Stwórz nową gałąź: `git switch -c feature/nazwa-zadania`.
+3. Po zakończeniu prac wypchnij gałąź: `git push origin feature/nazwa-zadania`.
+4. Otwórz **Pull Request** na GitHubie.
+
+---
+
+## 🏷️ Wersjonowanie (Tagowanie)
+
+Stosujemy **Semantic Versioning** w formacie `vX.Y.Z`:
+* **v1.0.0** – Pierwsze stabilne wydanie lub zmiany psujące kompatybilność.
+* **v1.1.0** – Dodanie nowej funkcjonalności (kompatybilnej wstecz).
+* **v1.0.1** – Poprawka błędu (bugfix).
+
+**Tworzenie taga lokalnie:**
+```bash
+git tag -a v1.0.0 -m "Opis wersji"
+git push origin v1.0.0

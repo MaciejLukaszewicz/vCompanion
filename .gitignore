@@ -43,3 +43,6 @@ Desktop.ini
 # Logs
 *.log
 log.txt
+
+# Application Data
+data/

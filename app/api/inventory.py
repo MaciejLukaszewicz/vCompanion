@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
 @router.get("/vms")
-async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = False):
+async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = False, selected_vm_id: str = None, selected_vcenter_id: str = None):
     """Returns the VM list partial for the inventory page with filtering."""
     require_auth(request)
     if not hasattr(request.app.state, 'vcenter_manager'):
@@ -69,7 +69,9 @@ async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = Fals
     from main import templates
     return templates.TemplateResponse("partials/inventory_vms_list.html", {
         "request": request,
-        "vms": vms
+        "vms": vms,
+        "selected_vm_id": selected_vm_id,
+        "selected_vcenter_id": selected_vcenter_id
     })
 
 @router.get("/vm-details/{vcenter_id}/{vm_id}")
@@ -98,10 +100,174 @@ async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
     vm['total_storage_formatted'] = format_bytes(total_bytes)
     vm['vram_formatted'] = f"{vm.get('vram_mb', 0) / 1024:.2f} GB" if vm.get('vram_mb', 0) >= 1024 else f"{vm.get('vram_mb', 0)} MB"
     
+    # --- BUILD NETWORK TREE (Unified) ---
+    network_tree = []
+    network_groups = {} # (sw_name, sw_type) -> group_info
+    try:
+        all_nets = request.app.state.vcenter_manager.cache.get_all_networks()
+        vc_nets = all_nets.get(vcenter_id, {})
+        host_id = vm.get('host_id')
+        host_net = next((h for h in vc_nets.get('hosts', []) if h.get('mo_id') == host_id), None)
+        
+        for nic in vm.get('nic_devices', []):
+            pg_name = "Unknown Network"
+            sw_name = "Unknown Switch"
+            sw_type = "vss"
+            uplinks = []
+            
+            backing = nic.get('backing', {})
+            if backing.get('type') == 'standard':
+                pg_name = backing.get('network_name', 'Unknown Network')
+                if host_net:
+                    pg_info = next((pg for pg in host_net.get('portgroups', []) if pg['name'] == pg_name or pg_name in pg['name']), None)
+                    if pg_info:
+                        sw_name = pg_info['vswitch']
+                        sw_info = next((sw for sw in host_net.get('switches', []) if sw['name'] == sw_name), None)
+                        if sw_info:
+                            uplinks = sw_info.get('uplinks', [])
+            
+            elif backing.get('type') == 'distributed':
+                pg_key = backing.get('portgroup_key')
+                dvpg = vc_nets.get('distributed_portgroups', {}).get(pg_key)
+                if dvpg:
+                    pg_name = dvpg['name']
+                    sw_type = 'vds'
+                    dvs = next((d for d in vc_nets.get('distributed_switches', []) if pg_key in d.get('portgroups', [])), None)
+                    if dvs:
+                        sw_name = dvs['name']
+                        if host_net:
+                            sw_info = next((sw for sw in host_net.get('switches', []) if sw['type'] == 'distributed' and sw['name'] == dvs['name']), None)
+                            if sw_info:
+                                uplinks = sw_info.get('uplinks', [])
+            
+            group_key = (sw_name, sw_type)
+            if group_key not in network_groups:
+                network_groups[group_key] = {
+                    "switch": sw_name,
+                    "switch_type": sw_type,
+                    "uplinks": uplinks,
+                    "portgroups": {} # pg_name -> [nics]
+                }
+            
+            if pg_name not in network_groups[group_key]["portgroups"]:
+                network_groups[group_key]["portgroups"][pg_name] = []
+            
+            network_groups[group_key]["portgroups"][pg_name].append({
+                "label": nic['label'],
+                "mac": nic['mac'],
+                "connected": nic['connected']
+            })
+        
+        # Convert to list for template
+        for sw_key, sw_data in network_groups.items():
+            pg_list = []
+            for pg_name, nics in sw_data["portgroups"].items():
+                pg_list.append({"name": pg_name, "nics": nics})
+            sw_data["portgroups"] = pg_list
+            network_tree.append(sw_data)
+    except Exception as e:
+        logger.error(f"Error building network tree: {e}")
+            
+    # --- BUILD STORAGE TREE ---
+    storage_groups = {} # (ds_name, cluster) -> group_info
+    storage_tree = []
+    try:
+        all_storage = request.app.state.vcenter_manager.cache.get_all_storage()
+        vc_storage = all_storage.get(vcenter_id, {})
+        ds_map = vc_storage.get('datastores', {})
+        clusters = vc_storage.get('clusters', [])
+        host_storage = vc_storage.get('host_storage', {})
+        
+        active_host_id = vm.get('host_id')
+        active_host_storage = host_storage.get(active_host_id, {})
+        
+        for disk in vm.get('disk_devices', []):
+            ds_id = disk.get('datastore_id')
+            ds_name = disk.get('datastore_name', 'Unknown Datastore')
+            
+            # Find cluster
+            ds_cluster = None
+            if ds_id:
+                for cl in clusters:
+                    if ds_id in cl.get('datastores', []):
+                        ds_cluster = cl['name']
+                        break
+            
+            # Simple grouping key
+            group_key = (ds_name, ds_cluster)
+            
+            if group_key not in storage_groups:
+                storage_groups[group_key] = {
+                    "datastore": ds_name,
+                    "cluster": ds_cluster,
+                    "disks": [],
+                    "hbas": [],
+                    "connection_type": "Storage"
+                }
+
+            group = storage_groups[group_key]
+            group['disks'].append({
+                "label": disk.get('label', 'Hard Disk'),
+                "capacity_gb": disk.get('capacity_gb', 0)
+            })
+            
+            # Enrich path info once per unique Datastore ID if available
+            if ds_id and not group['hbas']:
+                ds_info = ds_map.get(ds_id)
+                if ds_info:
+                    ds_type = ds_info.get('type', 'Unknown')
+                    ds_extra = ds_info.get('extra', {})
+                    
+                    # Connection type
+                    if ds_extra.get('is_vsan'): group['connection_type'] = "vSAN Storage"
+                    elif ds_extra.get('nfs_server'): group['connection_type'] = "NFS Storage"
+                    elif ds_type == 'VMFS': group['connection_type'] = "VMFS Path"
+                    else: group['connection_type'] = f"{ds_type} Storage"
+
+                    # HBAs
+                    if active_host_storage:
+                        hbas_map = active_host_storage.get('hbas', {})
+                        disk_to_hba = active_host_storage.get('disk_to_hba', {})
+                        extents = ds_info.get('extents', [])
+                        
+                        found_hbas = {}
+                        for ext in extents:
+                            norm_ext = ext.split("/")[-1]
+                            hba_keys = disk_to_hba.get(norm_ext, [])
+                            if isinstance(hba_keys, str): hba_keys = [hba_keys]
+                            for h_key in hba_keys:
+                                if h_key in hbas_map:
+                                    found_hbas[h_key] = hbas_map[h_key]
+                        
+                        group['hbas'] = list(found_hbas.values())
+                        if group['hbas']:
+                            types = {h['type'].upper() for h in group['hbas']}
+                            group['connection_type'] = f"{'/'.join(sorted(types))} Storage"
+                        
+                        # Fallback for NFS/vSAN
+                        if not group['hbas']:
+                            if ds_extra.get('nfs_server'):
+                                group['hbas'].append({
+                                    "device": "NFS Client", "type": "nfs",
+                                    "id": f"{ds_extra['nfs_server']}:{ds_extra['nfs_path']}"
+                                })
+                            elif ds_extra.get('is_vsan'):
+                                group['hbas'].append({
+                                    "device": "vSAN Distributed", "type": "vsan",
+                                    "id": "vSAN Object Storage"
+                                })
+        
+        storage_tree = list(storage_groups.values())
+            
+    except Exception as e:
+        logger.error(f"Error building storage tree: {e}")
+
     from main import templates
     return templates.TemplateResponse("partials/inventory_vm_details.html", {
         "request": request,
-        "vm": vm
+        "vm": vm,
+        "network_tree": network_tree,
+        "storage_tree": storage_tree
     })
 
 @router.get("/hosts")

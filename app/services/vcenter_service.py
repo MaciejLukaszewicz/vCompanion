@@ -296,6 +296,7 @@ class VCenterConnection:
                 "guest.ipAddress", "summary.config.numVirtualDisks", 
                 "guest.net", "snapshot",
                 "config.hardware.numCPU", "config.hardware.memoryMB",
+                "config.hardware.device",
                 "summary.storage.committed", "summary.storage.uncommitted",
                 "summary.config.annotation",
                 "summary.quickStats.overallCpuUsage", "summary.quickStats.guestMemoryUsage",
@@ -340,9 +341,52 @@ class VCenterConnection:
                     elif p.name == "summary.config.numVirtualDisks": d["disks"] = p.val
                     elif p.name == "runtime.host":
                         host_mor = p.val
+                        d["host_id"] = host_mor._moId
                         d["host"] = host_map.get(host_mor._moId, f"Host:{host_mor._moId}")
                     elif p.name == "config.hardware.numCPU": d["vcpu"] = p.val
                     elif p.name == "config.hardware.memoryMB": d["vram_mb"] = p.val
+                    elif p.name == "config.hardware.device":
+                        nics = []
+                        disks = []
+                        for dev in p.val:
+                            # 1. Network Interfaces
+                            if isinstance(dev, vim.vm.device.VirtualEthernetCard):
+                                backing_info = {"type": "unknown"}
+                                b = dev.backing
+                                if isinstance(b, vim.vm.device.VirtualEthernetCard.NetworkBackingInfo):
+                                    backing_info = {"type": "standard", "network_name": b.deviceName}
+                                elif isinstance(b, vim.vm.device.VirtualEthernetCard.DistributedVirtualPortBackingInfo):
+                                    backing_info = {
+                                        "type": "distributed", 
+                                        "portgroup_key": b.port.portgroupKey,
+                                        "switch_uuid": b.port.switchUuid
+                                    }
+                                
+                                nics.append({
+                                    "label": dev.deviceInfo.label,
+                                    "mac": dev.macAddress,
+                                    "connected": dev.connectable.connected if dev.connectable else False,
+                                    "backing": backing_info
+                                })
+                            
+                            # 2. Virtual Disks
+                            elif isinstance(dev, vim.vm.device.VirtualDisk):
+                                ds_name = "Unknown"
+                                ds_mo_id = None
+                                if hasattr(dev.backing, 'datastore'):
+                                    ds_name = dev.backing.datastore.name if hasattr(dev.backing.datastore, 'name') else "Datastore"
+                                    ds_mo_id = dev.backing.datastore._moId
+                                
+                                disks.append({
+                                    "label": dev.deviceInfo.label,
+                                    "capacity_gb": round(dev.capacityInBytes / (1024**3), 2),
+                                    "datastore_name": ds_name,
+                                    "datastore_id": ds_mo_id,
+                                    "file": getattr(dev.backing, 'fileName', 'N/A')
+                                })
+                        
+                        d["nic_devices"] = nics
+                        d["disk_devices"] = disks
                     elif p.name == "summary.storage.committed": d["storage_committed"] = p.val
                     elif p.name == "summary.storage.uncommitted": d["storage_uncommitted"] = p.val
                     elif p.name == "summary.config.annotation": d["notes"] = p.val
@@ -803,15 +847,15 @@ class VCenterConnection:
                 for obj in props:
                     p_dict = {p.name: p.val for p in obj.propSet}
                     
-                    # Map pNIC keys to device names for this host
-                    pnic_map = {p.key: p.device for p in p_dict.get("config.network.pnic", [])}
+                    # Map pNIC keys to device names and MACs for this host
+                    pnic_map = {p.key: {"device": p.device, "mac": p.mac} for p in p_dict.get("config.network.pnic", [])}
                     
                     switches = []
                     for vss in p_dict.get("config.network.vswitch", []):
                         switches.append({
                             "name": vss.name,
                             "type": "standard",
-                            "uplinks": [pnic_map.get(u, u) for u in (vss.pnic or [])],
+                            "uplinks": [pnic_map.get(u) for u in (vss.pnic or []) if u in pnic_map],
                             "portgroups": vss.portgroup or []
                         })
                     
@@ -819,7 +863,7 @@ class VCenterConnection:
                         switches.append({
                             "name": ps.dvsName,
                             "type": "distributed",
-                            "uplinks": [pnic_map.get(pnic, pnic) for pnic in (ps.pnic or [])],
+                            "uplinks": [pnic_map.get(pnic) for pnic in (ps.pnic or []) if pnic in pnic_map],
                             "dvs_uuid": ps.dvsUuid
                         })
 
@@ -910,11 +954,17 @@ class VCenterConnection:
                     
                     # More reliable check if possible via info
                     info = p_dict.get("info")
+                    extents = []
+                    ds_extra = {}
                     if info:
                         if isinstance(info, vim.VmfsDatastoreInfo):
-                            # VMFS often shared, check if local
-                            pass
-
+                            extents = [e.diskName for e in info.vmfs.extent]
+                        elif isinstance(info, vim.host.NasDatastoreInfo):
+                            ds_extra["nfs_server"] = info.nas.remoteHost
+                            ds_extra["nfs_path"] = info.nas.remotePath
+                        elif isinstance(info, vim.host.VsanDatastoreInfo):
+                            ds_extra["is_vsan"] = True
+                    
                     datastores[obj.obj._moId] = {
                         "name": p_dict.get("name"),
                         "capacity": summary.capacity if summary else 0,
@@ -922,31 +972,97 @@ class VCenterConnection:
                         "type": summary.type if summary else "Unknown",
                         "accessible": summary.accessible if summary else False,
                         "hosts": [h.key._moId for h in p_dict.get("host", []) if hasattr(h, 'key')],
-                        "is_local": is_local
+                        "is_local": is_local,
+                        "extents": extents,
+                        "extra": ds_extra
                     }
             except: pass
 
-            # 3. Fetch Hosts to get names for MOID mapping
+            # 3. Fetch Hosts to get names and HBA/Topology for mapping
             host_map = {}
+            host_hbas = {} # mo_id -> hba info and disk mapping
             try:
                 view = self.content.viewManager.CreateContainerView(self.content.rootFolder, [vim.HostSystem], True)
                 props = self.content.propertyCollector.RetrieveContents([
                     vim.PropertyFilterSpec(
-                        propSet=[vim.PropertySpec(type=vim.HostSystem, pathSet=["name"])],
+                        propSet=[vim.PropertySpec(type=vim.HostSystem, pathSet=["name", "config.storageDevice"])],
                         objectSet=[vim.ObjectSpec(obj=view, skip=True, selectSet=[vim.TraversalSpec(name="t", path="view", skip=False, type=vim.ContainerView)])]
                     )
                 ])
                 view.Destroy()
                 for obj in props:
                     p_dict = {p.name: p.val for p in obj.propSet}
-                    host_map[obj.obj._moId] = p_dict.get("name")
-            except: pass
+                    host_id = obj.obj._moId
+                    host_map[host_id] = p_dict.get("name")
+                    
+                    # Initialize empty entry so we don't get 'falsy' dict later if it has at least keys
+                    host_hbas[host_id] = {"hbas": {}, "disk_to_hba": {}}
+                    
+                    # Process HBAs
+                    storage_dev = p_dict.get("config.storageDevice")
+                    if storage_dev:
+                        # ... process ...
+                        # (repeating logic for replacement)
+                        hbas = {}
+                        for hba in storage_dev.hostBusAdapter:
+                            hba_info = {"device": hba.device, "type": "unknown", "id": "N/A"}
+                            
+                            # Safe type checking
+                            hba_type_str = str(type(hba)).lower()
+                            
+                            if isinstance(hba, vim.host.FibreChannelHba):
+                                hba_info["type"] = "fc"
+                                if hasattr(hba, 'portWorldWideName'):
+                                    wwn = hex(hba.portWorldWideName).replace("0x", "").rstrip("l").zfill(16)
+                                    hba_info["id"] = ":".join(wwn[i:i+2] for i in range(0, 16, 2))
+                            elif isinstance(hba, vim.host.InternetScsiHba):
+                                hba_info["type"] = "iscsi"
+                                hba_info["id"] = getattr(hba, 'iScsiName', 'N/A')
+                            elif "sashba" in hba_type_str or "parallelscsihba" in hba_type_str:
+                                hba_info["type"] = "sas/scsi"
+                            elif "blockhba" in hba_type_str:
+                                hba_info["type"] = "local/block"
+                                
+                            hbas[hba.key] = hba_info
+                        
+                        disk_to_hbas = {}
+                        if storage_dev.scsiTopology and storage_dev.scsiLun:
+                            lun_map = {l.key: l.canonicalName for l in storage_dev.scsiLun if hasattr(l, 'canonicalName')}
+                            
+                            for adapter in storage_dev.scsiTopology.adapter:
+                                for target in (adapter.target or []):
+                                    for lun in (target.lun or []):
+                                        c_name = lun_map.get(lun.scsiLun)
+                                        if c_name:
+                                            # Normalize c_name (strip prefixes if any)
+                                            norm_name = c_name.split("/")[-1] 
+                                            if norm_name not in disk_to_hbas: disk_to_hbas[norm_name] = []
+                                            if adapter.adapter not in disk_to_hbas[norm_name]: 
+                                                disk_to_hbas[norm_name].append(adapter.adapter)
+                        
+                        host_hbas[host_id] = {
+                            "hbas": hbas,
+                            "disk_to_hba": disk_to_hbas
+                        }
+                logger.info(f"[{self.config.name}] Processed storage data for {len(host_hbas)} hosts")
+            except Exception as e:
+                logger.error(f"Error fetching host storage data: {e}")
+
+            # 4. Enhance Datastore info with extents (canonical names)
+            for ds_id, ds in datastores.items():
+                try:
+                    # We might need to refetch or look into 'info' if we had it
+                    # But for now, let's assume we can get extents if info was Vmfs
+                    # In get_storage_speed step 2, we fetched 'info'
+                    pass
+                except: pass
 
             return {
                 "vcenter_id": self.config.id,
                 "clusters": ds_clusters,
                 "datastores": datastores,
-                "host_names": host_map
+                "host_names": host_map,
+                "host_storage": host_hbas
             }
         except Exception as e:
             logger.error(f"[{self.config.name}] Error fetching storage: {e}")

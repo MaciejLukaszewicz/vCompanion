@@ -1,27 +1,28 @@
 <table class="inventory-list-table">
-    <thead>
+    <thead
+        style="position: sticky; top: 0; z-index: 50; background-color: var(--bg-main); background: var(--bg-main); box-shadow: 0 2px 2px -1px rgba(0,0,0,0.4);">
         <tr>
-            <th style="width: 35%;">Name</th>
-            <th style="width: 20%;">vCenter</th>
-            <th style="width: 30%;">Primary IP</th>
-            <th style="width: 15%;">Status</th>
+            <th style="width: 40%;">Name</th>
+            <th style="width: 20%;" class="hidable">vCenter</th>
+            <th style="width: 25%;" class="hidable">Primary IP</th>
+            <th style="width: 15%;" class="hidable">Status</th>
         </tr>
     </thead>
     <tbody>
         {% if vms %}
         {% for vm in vms %}
-        <tr class="vm-row vc-color-{{ vm.vc_color_index }}" data-vcenter-id="{{ vm.vcenter_id }}"
-            data-vm-id="{{ vm.id }}" hx-get="/api/inventory/vm-details/{{ vm.vcenter_id }}/{{ vm.id }}"
-            hx-target="#vm-details-panel" hx-trigger="click">
+        <tr class="vm-row vc-color-{{ vm.vc_color_index }} {{ 'selected' if vm.id == selected_vm_id and vm.vcenter_id == selected_vcenter_id else '' }}"
+            data-vcenter-id="{{ vm.vcenter_id }}" data-vm-id="{{ vm.id }}"
+            hx-get="/api/inventory/vm-details/{{ vm.vcenter_id }}/{{ vm.id }}" hx-target="#vm-details-panel"
+            hx-trigger="click">
             <td style="font-weight: 600; color: var(--text-main);">{{ vm.name }}</td>
-            <td style="font-size: 0.75rem; color: var(--text-dim);">{{ vm.vcenter_name }}</td>
-            <td style="font-family: monospace; font-size: 0.85rem;">{{ vm.ip or '--' }}</td>
-            <td>
+            <td style="font-size: 0.75rem; color: var(--text-dim);" class="hidable">{{ vm.vcenter_name }}</td>
+            <td style="font-family: monospace; font-size: 0.85rem;" class="hidable">{{ vm.ip or '--' }}</td>
+            <td class="hidable">
                 <span class="status-badge {{ 'success' if vm.power_state == 'poweredOn' else 'dim' }}"
                     style="font-size: 0.65rem;">
                     {{ 'ON' if vm.power_state == 'poweredOn' else 'OFF' }}
                 </span>
-            </td>
             </td>
         </tr>
         {% endfor %}
