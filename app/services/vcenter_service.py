@@ -296,6 +296,7 @@ class VCenterConnection:
                 "guest.ipAddress", "summary.config.numVirtualDisks", 
                 "guest.net", "snapshot",
                 "config.hardware.numCPU", "config.hardware.memoryMB",
+                "config.hardware.device",
                 "summary.storage.committed", "summary.storage.uncommitted",
                 "summary.config.annotation",
                 "summary.quickStats.overallCpuUsage", "summary.quickStats.guestMemoryUsage",
@@ -340,9 +341,52 @@ class VCenterConnection:
                     elif p.name == "summary.config.numVirtualDisks": d["disks"] = p.val
                     elif p.name == "runtime.host":
                         host_mor = p.val
+                        d["host_id"] = host_mor._moId
                         d["host"] = host_map.get(host_mor._moId, f"Host:{host_mor._moId}")
                     elif p.name == "config.hardware.numCPU": d["vcpu"] = p.val
                     elif p.name == "config.hardware.memoryMB": d["vram_mb"] = p.val
+                    elif p.name == "config.hardware.device":
+                        nics = []
+                        disks = []
+                        for dev in p.val:
+                            # 1. Network Interfaces
+                            if isinstance(dev, vim.vm.device.VirtualEthernetCard):
+                                backing_info = {"type": "unknown"}
+                                b = dev.backing
+                                if isinstance(b, vim.vm.device.VirtualEthernetCard.NetworkBackingInfo):
+                                    backing_info = {"type": "standard", "network_name": b.deviceName}
+                                elif isinstance(b, vim.vm.device.VirtualEthernetCard.DistributedVirtualPortBackingInfo):
+                                    backing_info = {
+                                        "type": "distributed", 
+                                        "portgroup_key": b.port.portgroupKey,
+                                        "switch_uuid": b.port.switchUuid
+                                    }
+                                
+                                nics.append({
+                                    "label": dev.deviceInfo.label,
+                                    "mac": dev.macAddress,
+                                    "connected": dev.connectable.connected if dev.connectable else False,
+                                    "backing": backing_info
+                                })
+                            
+                            # 2. Virtual Disks
+                            elif isinstance(dev, vim.vm.device.VirtualDisk):
+                                ds_name = "Unknown"
+                                ds_mo_id = None
+                                if hasattr(dev.backing, 'datastore'):
+                                    ds_name = dev.backing.datastore.name if hasattr(dev.backing.datastore, 'name') else "Datastore"
+                                    ds_mo_id = dev.backing.datastore._moId
+                                
+                                disks.append({
+                                    "label": dev.deviceInfo.label,
+                                    "capacity_gb": round(dev.capacityInBytes / (1024**3), 2),
+                                    "datastore_name": ds_name,
+                                    "datastore_id": ds_mo_id,
+                                    "file": getattr(dev.backing, 'fileName', 'N/A')
+                                })
+                        
+                        d["nic_devices"] = nics
+                        d["disk_devices"] = disks
                     elif p.name == "summary.storage.committed": d["storage_committed"] = p.val
                     elif p.name == "summary.storage.uncommitted": d["storage_uncommitted"] = p.val
                     elif p.name == "summary.config.annotation": d["notes"] = p.val

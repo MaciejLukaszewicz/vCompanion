@@ -100,7 +100,262 @@
         </div>
     </div>
 
-    <!-- 5. Notes / Annotation -->
+    <!-- 5. Network Topology Diagram -->
+    <div class="detail-section" style="margin-top: 2.5rem;">
+        <h4><i data-lucide="route" size="14"></i> Network Topology</h4>
+
+        <style>
+            .topo-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 1.5rem;
+                background: rgba(0, 0, 0, 0.1);
+                border-radius: 1rem;
+                border: 1px solid var(--border);
+                overflow-x: auto;
+            }
+
+            .topo-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 0.25rem;
+                padding: 0.75rem 1.25rem;
+                background: var(--panel-bg);
+                border: 1px solid var(--border);
+                border-radius: 0.75rem;
+                min-width: 140px;
+                position: relative;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+
+            .topo-item i {
+                color: var(--primary);
+                margin-bottom: 0.25rem;
+            }
+
+            .topo-item .label {
+                font-size: 0.65rem;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                font-weight: 700;
+                letter-spacing: 0.05em;
+            }
+
+            .topo-item .value {
+                font-size: 0.875rem;
+                font-weight: 600;
+                color: var(--text-main);
+                text-align: center;
+            }
+
+            .topo-item .sub {
+                font-size: 0.75rem;
+                color: var(--text-dim);
+                font-family: monospace;
+            }
+
+            .topo-connector {
+                width: 2px;
+                height: 20px;
+                background: linear-gradient(to bottom, var(--primary), var(--border));
+            }
+
+            .nic-row {
+                display: flex;
+                gap: 2rem;
+                justify-content: center;
+                width: 100%;
+            }
+
+            .nic-branch {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                flex: 1;
+                min-width: 200px;
+            }
+
+            .uplink-container {
+                display: flex;
+                gap: 0.5rem;
+                margin-top: 0.5rem;
+            }
+
+            .uplink-tag {
+                background: rgba(var(--primary-rgb), 0.1);
+                border: 1px solid var(--primary);
+                color: var(--primary);
+                font-size: 0.7rem;
+                padding: 0.15rem 0.5rem;
+                border-radius: 1rem;
+                font-weight: 700;
+            }
+
+            .type-badge {
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                background: var(--border);
+                color: var(--text-main);
+                font-size: 0.6rem;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-weight: 800;
+                text-transform: uppercase;
+            }
+        </style>
+
+        <div class="topo-container">
+            <!-- Root VM Node -->
+            <div class="topo-item" style="border-color: var(--primary); background: rgba(var(--primary-rgb), 0.05);">
+                <span class="label">Virtual Machine</span>
+                <i data-lucide="monitor" size="20"></i>
+                <span class="value">{{ vm.name }}</span>
+            </div>
+
+            <div class="topo-connector"></div>
+
+            <!-- vNIC Row -->
+            <div class="nic-row">
+                {% for nic in network_tree %}
+                <div class="nic-branch">
+                    <!-- vNIC -->
+                    <div class="topo-item">
+                        <span class="label">{{ nic.label }}</span>
+                        <i data-lucide="link" size="18"></i>
+                        <span class="value"
+                            style="font-family: monospace; font-size: 0.75rem; color: {{ 'var(--success)' if nic.connected else 'var(--text-dim)' }}">{{
+                            nic.mac }}</span>
+                        {% if not nic.connected %}<span class="type-badge"
+                            style="background: var(--danger);">Disconnected</span>{% endif %}
+                    </div>
+
+                    <div class="topo-connector"></div>
+
+                    <!-- Portgroup -->
+                    <div class="topo-item">
+                        <span class="label">Portgroup</span>
+                        <i data-lucide="network" size="18" style="color: #a855f7;"></i>
+                        <span class="value">{{ nic.portgroup }}</span>
+                    </div>
+
+                    <div class="topo-connector"></div>
+
+                    <!-- Switch -->
+                    <div class="topo-item">
+                        <span class="type-badge">{{ nic.switch_type }}</span>
+                        <span class="label">vSwitch</span>
+                        <i data-lucide="share-2" size="18" style="color: #ec4899;"></i>
+                        <span class="value">{{ nic.switch }}</span>
+                    </div>
+
+                    <div class="topo-connector"></div>
+
+                    <!-- Host -->
+                    <div class="topo-item">
+                        <span class="label">ESXi Host</span>
+                        <i data-lucide="server" size="18" style="color: #f59e0b;"></i>
+                        <span class="value">{{ vm.host }}</span>
+                    </div>
+
+                    <div class="topo-connector"></div>
+
+                    <!-- Uplinks -->
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <span class="label">Physical Uplinks</span>
+                        <div class="uplink-container">
+                            {% for up in nic.uplinks %}
+                            <div class="uplink-tag"><i data-lucide="cpu" size="10"
+                                    style="margin-right: 2px; vertical-align: middle;"></i>{{ up }}</div>
+                            {% endfor %}
+                            {% if not nic.uplinks %}
+                            <span style="font-size: 0.75rem; color: var(--text-dim); font-style: italic;">No
+                                Uplinks</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Storage Topology Diagram -->
+    <div class="detail-section" style="margin-top: 2.5rem;">
+        <h4><i data-lucide="layers" size="14"></i> Storage Topology</h4>
+        <div class="topo-container">
+            <!-- Root VM Node -->
+            <div class="topo-item" style="border-color: var(--primary); background: rgba(var(--primary-rgb), 0.05);">
+                <span class="label">Virtual Machine</span>
+                <i data-lucide="monitor" size="20"></i>
+                <span class="value">{{ vm.name }}</span>
+            </div>
+
+            <div class="topo-connector"></div>
+
+            <!-- Disk Row -->
+            <div class="nic-row" style="gap: 1.5rem;">
+                {% for disk in storage_tree %}
+                <div class="nic-branch">
+                    <!-- Disk Device -->
+                    <div class="topo-item">
+                        <span class="label">{{ disk.label }}</span>
+                        <i data-lucide="hard-drive" size="18" style="color: #6366f1;"></i>
+                        <span class="value">{{ disk.capacity_gb }} GB</span>
+                    </div>
+
+                    <div class="topo-connector"></div>
+
+                    <!-- Datastore -->
+                    <div class="topo-item" style="min-width: 160px;">
+                        <span class="label">Datastore</span>
+                        <i data-lucide="database" size="18" style="color: #10b981;"></i>
+                        <span class="value">{{ disk.datastore }}</span>
+                    </div>
+
+                    {% if disk.cluster %}
+                    <div class="topo-connector"></div>
+                    <!-- Datastore Cluster -->
+                    <div class="topo-item">
+                        <span class="label">Storage Cluster</span>
+                        <i data-lucide="box" size="18" style="color: #3b82f6;"></i>
+                        <span class="value">{{ disk.cluster }}</span>
+                    </div>
+                    {% endif %}
+
+                    <div class="topo-connector"></div>
+
+                    <!-- Host Availability -->
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <span class="label">Accessible By Hosts</span>
+                        <div class="uplink-container"
+                            style="flex-wrap: wrap; justify-content: center; max-width: 250px;">
+                            {% for host in disk.hosts[:4] %}
+                            <div class="uplink-tag"
+                                style="background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981;">{{
+                                host }}</div>
+                            {% endfor %}
+                            {% if disk.hosts|length > 4 %}
+                            <div class="uplink-tag"
+                                style="background: rgba(255, 255, 255, 0.05); border-color: var(--border); color: var(--text-dim);">
+                                +{{ disk.hosts|length - 4 }} more</div>
+                            {% endif %}
+                            {% if not disk.hosts %}
+                            <span
+                                style="font-size: 0.75rem; color: var(--text-dim); font-style: italic;">Standalone/Local</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. Notes / Annotation -->
     <div class="detail-section" style="margin-top: 2.5rem;">
         <h4><i data-lucide="sticky-note" size="14"></i> Notes / Annotation</h4>
         <div
