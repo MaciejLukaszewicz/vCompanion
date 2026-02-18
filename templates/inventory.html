@@ -68,7 +68,8 @@
 
         <div id="vms-content" style="display: flex; height: 600px; border-top: none;">
             <!-- Left Side: VM List -->
-            <div class="inventory-list-pane" style="flex: 1; border-right: 1px solid var(--border); overflow-y: auto;">
+            <div class="inventory-list-pane" id="vm-list-pane"
+                style="flex: 1; border-right: 1px solid var(--border); overflow-y: auto; position: relative; transition: all 0.3s ease;">
                 <div id="vm-list-target" hx-get="/api/inventory/vms" hx-trigger="load, vcenter-refreshed from:body">
                     <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
                         <div class="spinner-small" style="margin-bottom: 1rem;"></div>
@@ -77,9 +78,14 @@
                 </div>
             </div>
 
+            <!-- Collapse Toggle Button -->
+            <div class="pane-toggle-btn" onclick="togglePaneCollapse()" id="vm-pane-toggle" title="Toggle Sidebar">
+                <i data-lucide="chevron-left" id="toggle-icon"></i>
+            </div>
+
             <!-- Right Side: VM Details -->
             <div class="inventory-details-pane" id="vm-details-panel"
-                style="flex: 1.2; background: rgba(0,0,0,0.1); overflow-y: auto;">
+                style="flex: 1.2; background: rgba(0,0,0,0.1); overflow-y: auto; transition: all 0.3s ease;">
                 <div
                     style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); padding: 2rem; text-align: center;">
                     <i data-lucide="info" size="48" style="margin-bottom: 1rem; opacity: 0.2;"></i>
@@ -379,6 +385,47 @@
         animation: spin 1s linear infinite;
         margin: 0 auto;
     }
+
+    /* Pane Toggle Button Style */
+    .pane-toggle-btn {
+        width: 24px;
+        height: 24px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        margin-left: -12px;
+        margin-right: -12px;
+        z-index: 20;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-dim);
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .pane-toggle-btn:hover {
+        color: var(--primary);
+        border-color: var(--primary);
+        transform: translateY(-50%) scale(1.1);
+    }
+
+    /* Collapse states */
+    #vm-list-pane.is-collapsed {
+        flex: 0 0 250px !important;
+    }
+
+    #vm-list-pane.is-collapsed .hidable {
+        display: none !important;
+    }
+
+    #vm-list-pane.is-collapsed th {
+        width: 100% !important;
+    }
 </style>
 {% endblock %}
 
@@ -475,6 +522,27 @@
             icon.style.opacity = '1';
             icon.style.pointerEvents = 'auto';
         }, 2000);
+    }
+
+    function togglePaneCollapse() {
+        const pane = document.getElementById('vm-list-pane');
+        const details = document.getElementById('vm-details-panel');
+        const icon = document.getElementById('toggle-icon');
+
+        const isCollapsed = pane.classList.toggle('is-collapsed');
+
+        if (isCollapsed) {
+            details.style.flex = "2";
+            icon.setAttribute('data-lucide', 'chevron-right');
+        } else {
+            details.style.flex = "1.2";
+            icon.setAttribute('data-lucide', 'chevron-left');
+        }
+
+        // Re-render Lucide icons
+        if (window.lucide) {
+            lucide.createIcons();
+        }
     }
 </script>
 {% endblock %}
