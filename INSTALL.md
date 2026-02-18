@@ -14,14 +14,20 @@ Before starting, ensure you have the following:
 
 ---
 
-## 1. Clone the Repository
+## 1. Get the Code
 
-Open PowerShell or Command Prompt and run:
+### Option A: Clone with Git (Recommended)
+Cloning the repository allows you to use the automatic `update.bat` script later.
 
 ```powershell
 git clone https://github.com/MaciejLukaszewicz/vCompanion.git
 cd vCompanion
 ```
+
+### Option B: Download ZIP
+1. Go to the [Releases](https://github.com/MaciejLukaszewicz/vCompanion/releases) page.
+2. Download the `Source code (zip)` for the latest version.
+3. Extract the contents to your desired location and open a terminal in that folder.
 
 ---
 

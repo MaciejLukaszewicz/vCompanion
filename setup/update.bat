@@ -12,11 +12,17 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [INFO] Pulling latest changes from GitHub...
+echo [INFO] Checking for updates...
 cd ..
-git pull
-if %errorlevel% neq 0 (
-    echo [WARNING] git pull failed. Check your internet connection or repository status.
+if not exist ".git" (
+    echo [INFO] Project was downloaded as a ZIP file. Skipping git pull.
+    echo [INFO] To update, download the latest release and overwrite your files (excluding config/).
+) else (
+    echo [INFO] Pulling latest changes from GitHub...
+    git pull
+    if %errorlevel% neq 0 (
+        echo [WARNING] git pull failed. Check your internet connection or local changes.
+    )
 )
 
 echo [INFO] Updating dependencies...

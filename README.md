@@ -120,12 +120,19 @@
 
 ## 🚀 Quick Start
 
-### 1. Clone & Install
+### 1. Download & Install
+You can either clone the repository or download the **[Latest Release](https://github.com/MaciejLukaszewicz/vCompanion/releases)** as a ZIP file.
+
+**Option A: Git (recommended for easier updates)**
 ```powershell
 git clone https://github.com/MaciejLukaszewicz/vCompanion.git
 cd vCompanion
 .\setup\setup.bat
 ```
+
+**Option B: ZIP File**
+1. Download and extract the ZIP to a folder.
+2. Open PowerShell in that folder and run: `.\setup\setup.bat`
 
 ### 2. Configure
 On first run, `config/config.json` is created automatically with a default template. Edit it to add your vCenter servers:
