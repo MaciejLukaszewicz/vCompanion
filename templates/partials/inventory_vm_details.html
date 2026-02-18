@@ -261,46 +261,69 @@
             <div class="topo-connector"></div>
 
             <!-- vNIC Row -->
-            <div class="nic-row">
-                {% for nic in network_tree %}
-                <div class="nic-branch">
-                    <!-- vNIC -->
-                    <div class="topo-item">
-                        <span class="label">{{ nic.label }}</span>
-                        <i data-lucide="link" size="18"></i>
-                        <span class="value"
-                            style="font-family: monospace; font-size: 0.75rem; color: {{ 'var(--text-main)' if nic.connected else 'var(--text-dim)' }}">{{
-                            nic.mac }}</span>
-                        {% if not nic.connected %}<span class="type-badge"
-                            style="background: var(--danger);">Disconnected</span>{% endif %}
+            <div class="nic-row" style="gap: 2rem;">
+                {% for group in network_tree %}
+                <div class="nic-branch" style="align-items: center;">
+
+                    <!-- Portgroups & NICs (Multiple branches per Switch) -->
+                    <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
+                        {% for pg in group.portgroups %}
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <!-- vNICs Pill -->
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                                <span class="label">vNICs</span>
+                                <div class="uplink-pill"
+                                    style="border-color: #3b82f6; background: rgba(59, 130, 246, 0.05);">
+                                    {% for nic in pg.nics %}
+                                    <div class="uplink-pill-item" style="padding: 0.5rem 1rem; min-width: 120px;">
+                                        <div class="dev-name" style="color: #3b82f6;">
+                                            <i data-lucide="link" size="12"></i>
+                                            <span>{{ nic.label }}</span>
+                                        </div>
+                                        <div
+                                            style="font-size: 0.6rem; font-family: monospace; color: {{ 'var(--text-main)' if nic.connected else 'var(--text-dim)' }}; margin-top: 2px;">
+                                            {{ nic.mac }}
+                                        </div>
+                                        {% if not nic.connected %}
+                                        <span class="type-badge"
+                                            style="background: var(--danger); font-size: 0.5rem; position: relative; top: 0; right: 0;">Disconnected</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if not loop.last %}
+                                    <div style="width: 1px; background: rgba(59, 130, 246, 0.3);"></div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="topo-connector"></div>
+
+                            <!-- Portgroup -->
+                            <div class="topo-item" style="min-width: 160px;">
+                                <span class="label">Portgroup</span>
+                                <i data-lucide="network" size="18" style="color: #a855f7;"></i>
+                                <span class="value">{{ pg.name }}</span>
+                            </div>
+
+                            <div class="topo-connector"></div>
+                        </div>
+                        {% endfor %}
                     </div>
 
-                    <div class="topo-connector"></div>
-
-                    <!-- Portgroup -->
-                    <div class="topo-item">
-                        <span class="label">Portgroup</span>
-                        <i data-lucide="network" size="18" style="color: #a855f7;"></i>
-                        <span class="value">{{ nic.portgroup }}</span>
-                    </div>
-
-                    <div class="topo-connector"></div>
-
-                    <!-- Switch -->
-                    <div class="topo-item">
-                        <span class="type-badge">{{ nic.switch_type }}</span>
+                    <!-- Unified Switch -->
+                    <div class="topo-item" style="width: 100%; max-width: none;">
+                        <span class="type-badge">{{ group.switch_type }}</span>
                         <span class="label">vSwitch</span>
-                        <i data-lucide="share-2" size="18" style="color: #ec4899;"></i>
-                        <span class="value">{{ nic.switch }}</span>
+                        <i data-lucide="share-2" size="22" style="color: #ec4899;"></i>
+                        <span class="value" style="font-size: 1rem;">{{ group.switch }}</span>
                     </div>
 
                     <div class="topo-connector"></div>
 
-                    <!-- Host & Uplinks Group -->
-                    <div class="host-group">
-                        <!-- Host -->
+                    <!-- Unified Host & Uplinks -->
+                    <div class="host-group" style="width: 100%;">
                         <div class="topo-item"
-                            style="box-shadow: none; border-color: rgba(245, 158, 11, 0.4); background: var(--panel-bg);">
+                            style="width: 100%; box-shadow: none; border-color: rgba(245, 158, 11, 0.4); background: var(--panel-bg);">
                             <span class="label">ESXi Host</span>
                             <i data-lucide="server" size="18" style="color: #f59e0b;"></i>
                             <span class="value">{{ vm.host.split('.')[0] }}</span>
@@ -308,11 +331,10 @@
 
                         <div class="topo-connector" style="height: 12px; background: rgba(245, 158, 11, 0.4);"></div>
 
-                        <!-- Uplinks -->
                         <div style="display: flex; flex-direction: column; align-items: center;">
                             <span class="label" style="margin-bottom: 6px;">Physical Uplinks</span>
                             <div class="uplink-pill">
-                                {% for up in nic.uplinks %}
+                                {% for up in group.uplinks %}
                                 <div class="uplink-pill-item">
                                     <div class="dev-name">
                                         <i data-lucide="cpu" size="10"></i>
@@ -321,11 +343,12 @@
                                     {% if up is mapping %}
                                     <div
                                         style="font-size: 0.55rem; font-family: monospace; color: var(--text-main); font-weight: 500;">
-                                        {{ up.mac }}</div>
+                                        {{ up.mac }}
+                                    </div>
                                     {% endif %}
                                 </div>
                                 {% endfor %}
-                                {% if not nic.uplinks %}
+                                {% if not group.uplinks %}
                                 <span
                                     style="font-size: 0.75rem; color: var(--text-dim); font-style: italic; padding: 0.5rem 1rem;">No
                                     Uplinks</span>

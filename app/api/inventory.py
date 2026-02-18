@@ -98,8 +98,9 @@ async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
     vm['total_storage_formatted'] = format_bytes(total_bytes)
     vm['vram_formatted'] = f"{vm.get('vram_mb', 0) / 1024:.2f} GB" if vm.get('vram_mb', 0) >= 1024 else f"{vm.get('vram_mb', 0)} MB"
     
-    # --- BUILD NETWORK TREE ---
+    # --- BUILD NETWORK TREE (Unified) ---
     network_tree = []
+    network_groups = {} # (sw_name, sw_type) -> group_info
     try:
         all_nets = request.app.state.vcenter_manager.cache.get_all_networks()
         vc_nets = all_nets.get(vcenter_id, {})
@@ -107,47 +108,68 @@ async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
         host_net = next((h for h in vc_nets.get('hosts', []) if h.get('mo_id') == host_id), None)
         
         for nic in vm.get('nic_devices', []):
-            nic_item = {
-                "label": nic['label'],
-                "mac": nic['mac'],
-                "connected": nic['connected'],
-                "portgroup": "Unknown Network",
-                "switch": "Unknown Switch",
-                "switch_type": "vss",
-                "uplinks": []
-            }
+            pg_name = "Unknown Network"
+            sw_name = "Unknown Switch"
+            sw_type = "vss"
+            uplinks = []
             
             backing = nic.get('backing', {})
             if backing.get('type') == 'standard':
-                pg_name = backing.get('network_name')
-                nic_item['portgroup'] = pg_name
+                pg_name = backing.get('network_name', 'Unknown Network')
                 if host_net:
                     pg_info = next((pg for pg in host_net.get('portgroups', []) if pg['name'] == pg_name or pg_name in pg['name']), None)
                     if pg_info:
                         sw_name = pg_info['vswitch']
-                        nic_item['switch'] = sw_name
                         sw_info = next((sw for sw in host_net.get('switches', []) if sw['name'] == sw_name), None)
                         if sw_info:
-                            nic_item['uplinks'] = sw_info.get('uplinks', [])
+                            uplinks = sw_info.get('uplinks', [])
             
             elif backing.get('type') == 'distributed':
                 pg_key = backing.get('portgroup_key')
                 dvpg = vc_nets.get('distributed_portgroups', {}).get(pg_key)
                 if dvpg:
-                    nic_item['portgroup'] = dvpg['name']
-                    nic_item['switch_type'] = 'vds'
+                    pg_name = dvpg['name']
+                    sw_type = 'vds'
                     dvs = next((d for d in vc_nets.get('distributed_switches', []) if pg_key in d.get('portgroups', [])), None)
                     if dvs:
-                        nic_item['switch'] = dvs['name']
+                        sw_name = dvs['name']
                         if host_net:
                             sw_info = next((sw for sw in host_net.get('switches', []) if sw['type'] == 'distributed' and sw['name'] == dvs['name']), None)
                             if sw_info:
-                                nic_item['uplinks'] = sw_info.get('uplinks', [])
+                                uplinks = sw_info.get('uplinks', [])
             
-            network_tree.append(nic_item)
+            group_key = (sw_name, sw_type)
+            if group_key not in network_groups:
+                network_groups[group_key] = {
+                    "switch": sw_name,
+                    "switch_type": sw_type,
+                    "uplinks": uplinks,
+                    "portgroups": {} # pg_name -> [nics]
+                }
             
-        storage_tree = []
-        storage_groups = {} # (ds_name, cluster) -> group_info
+            if pg_name not in network_groups[group_key]["portgroups"]:
+                network_groups[group_key]["portgroups"][pg_name] = []
+            
+            network_groups[group_key]["portgroups"][pg_name].append({
+                "label": nic['label'],
+                "mac": nic['mac'],
+                "connected": nic['connected']
+            })
+        
+        # Convert to list for template
+        for sw_key, sw_data in network_groups.items():
+            pg_list = []
+            for pg_name, nics in sw_data["portgroups"].items():
+                pg_list.append({"name": pg_name, "nics": nics})
+            sw_data["portgroups"] = pg_list
+            network_tree.append(sw_data)
+    except Exception as e:
+        logger.error(f"Error building network tree: {e}")
+            
+    # --- BUILD STORAGE TREE ---
+    storage_groups = {} # (ds_name, cluster) -> group_info
+    storage_tree = []
+    try:
         all_storage = request.app.state.vcenter_manager.cache.get_all_storage()
         vc_storage = all_storage.get(vcenter_id, {})
         ds_map = vc_storage.get('datastores', {})
@@ -236,7 +258,7 @@ async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
         storage_tree = list(storage_groups.values())
             
     except Exception as e:
-        logger.error(f"Error building trees for {vm_id}: {e}")
+        logger.error(f"Error building storage tree: {e}")
 
     from main import templates
     return templates.TemplateResponse("partials/inventory_vm_details.html", {
