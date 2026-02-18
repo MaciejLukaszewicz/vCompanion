@@ -146,13 +146,12 @@ async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
             
             network_tree.append(nic_item)
             
-        # --- BUILD STORAGE TREE ---
         storage_tree = []
+        storage_groups = {} # (ds_name, cluster) -> group_info
         all_storage = request.app.state.vcenter_manager.cache.get_all_storage()
         vc_storage = all_storage.get(vcenter_id, {})
         ds_map = vc_storage.get('datastores', {})
         clusters = vc_storage.get('clusters', [])
-        host_names = vc_storage.get('host_names', {})
         host_storage = vc_storage.get('host_storage', {})
         
         active_host_id = vm.get('host_id')
@@ -160,85 +159,81 @@ async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
         
         for disk in vm.get('disk_devices', []):
             ds_id = disk.get('datastore_id')
-            disk_item = {
-                "label": disk['label'],
-                "capacity_gb": disk['capacity_gb'],
-                "datastore": disk['datastore_name'],
-                "cluster": None,
-                "hosts": [],
-                "hbas": [],
-                "connection_type": "Storage" # Default
-            }
+            ds_name = disk.get('datastore_name', 'Unknown Datastore')
             
-            ds_info = ds_map.get(ds_id)
-            if ds_info:
-                disk_item['hosts'] = [host_names.get(h_id, h_id) for h_id in ds_info.get('hosts', [])]
-                
-                # Identify if datastore belongs to a cluster
+            # Find cluster
+            ds_cluster = None
+            if ds_id:
                 for cl in clusters:
                     if ds_id in cl.get('datastores', []):
-                        disk_item['cluster'] = cl['name']
+                        ds_cluster = cl['name']
                         break
-
-                # 1. High-level connection type from Datastore info
-                ds_type = ds_info.get('type', 'Unknown')
-                ds_extra = ds_info.get('extra', {})
-                if ds_extra.get('is_vsan') or ds_type.lower() == 'vsan':
-                    disk_item['connection_type'] = "vSAN Storage"
-                elif ds_extra.get('nfs_server') or ds_type.lower() == 'nfs' or ds_type.lower() == 'nfs41':
-                    disk_item['connection_type'] = "NFS Storage"
-                elif ds_type == 'VMFS':
-                    disk_item['connection_type'] = "VMFS Path"
-                else:
-                    disk_item['connection_type'] = f"{ds_type} Storage"
-
-                # 2. Identify HBAs (Multipathing) on the active host
-                if active_host_storage:
-                    hbas_map = active_host_storage.get('hbas', {})
-                    disk_to_hba = active_host_storage.get('disk_to_hba', {})
-                    extents = ds_info.get('extents', [])
-                    
-                    found_hbas = {} # key -> info to avoid duplicates
-                    for ext in extents:
-                        # Normalize extent name (e.g. strip /vmfs/devices/disks/)
-                        norm_ext = ext.split("/")[-1]
-                        
-                        hba_keys = disk_to_hba.get(norm_ext, [])
-                        if isinstance(hba_keys, str): hba_keys = [hba_keys]
-                        for h_key in hba_keys:
-                            if h_key in hbas_map:
-                                found_hbas[h_key] = hbas_map[h_key]
-                    
-                    disk_item['hbas'] = list(found_hbas.values())
-                    
-                    # Connection types refinements based on found HBAs
-                    if disk_item['hbas']:
-                        types = {h['type'].upper() for h in disk_item['hbas']}
-                        disk_item['connection_type'] = f"{'/'.join(sorted(types))} Storage"
-                    
-                    # Fallback HBAs for NFS/vSAN if none found via extents
-                    if not disk_item['hbas']:
-                        if ds_extra.get('nfs_server'):
-                            disk_item['hbas'].append({
-                                "device": "NFS Client",
-                                "type": "nfs",
-                                "id": f"{ds_extra['nfs_server']}:{ds_extra['nfs_path']}"
-                            })
-                        elif ds_extra.get('is_vsan') or ds_type.lower() == 'vsan':
-                            disk_item['hbas'].append({
-                                "device": "vSAN Distributed",
-                                "type": "vsan",
-                                "id": "vSAN Object Storage"
-                            })
-                else:
-                    # No host storage info in cache yet
-                    if ds_type == 'VMFS':
-                        disk_item['connection_type'] = "VMFS (Refresh Pending...)"
-                    elif ds_type.lower() in ['nfs', 'nfs41', 'vsan']:
-                         # These don't always need HBA info to be identified correctly
-                         pass
             
-            storage_tree.append(disk_item)
+            # Simple grouping key
+            group_key = (ds_name, ds_cluster)
+            
+            if group_key not in storage_groups:
+                storage_groups[group_key] = {
+                    "datastore": ds_name,
+                    "cluster": ds_cluster,
+                    "disks": [],
+                    "hbas": [],
+                    "connection_type": "Storage"
+                }
+
+            group = storage_groups[group_key]
+            group['disks'].append({
+                "label": disk.get('label', 'Hard Disk'),
+                "capacity_gb": disk.get('capacity_gb', 0)
+            })
+            
+            # Enrich path info once per unique Datastore ID if available
+            if ds_id and not group['hbas']:
+                ds_info = ds_map.get(ds_id)
+                if ds_info:
+                    ds_type = ds_info.get('type', 'Unknown')
+                    ds_extra = ds_info.get('extra', {})
+                    
+                    # Connection type
+                    if ds_extra.get('is_vsan'): group['connection_type'] = "vSAN Storage"
+                    elif ds_extra.get('nfs_server'): group['connection_type'] = "NFS Storage"
+                    elif ds_type == 'VMFS': group['connection_type'] = "VMFS Path"
+                    else: group['connection_type'] = f"{ds_type} Storage"
+
+                    # HBAs
+                    if active_host_storage:
+                        hbas_map = active_host_storage.get('hbas', {})
+                        disk_to_hba = active_host_storage.get('disk_to_hba', {})
+                        extents = ds_info.get('extents', [])
+                        
+                        found_hbas = {}
+                        for ext in extents:
+                            norm_ext = ext.split("/")[-1]
+                            hba_keys = disk_to_hba.get(norm_ext, [])
+                            if isinstance(hba_keys, str): hba_keys = [hba_keys]
+                            for h_key in hba_keys:
+                                if h_key in hbas_map:
+                                    found_hbas[h_key] = hbas_map[h_key]
+                        
+                        group['hbas'] = list(found_hbas.values())
+                        if group['hbas']:
+                            types = {h['type'].upper() for h in group['hbas']}
+                            group['connection_type'] = f"{'/'.join(sorted(types))} Storage"
+                        
+                        # Fallback for NFS/vSAN
+                        if not group['hbas']:
+                            if ds_extra.get('nfs_server'):
+                                group['hbas'].append({
+                                    "device": "NFS Client", "type": "nfs",
+                                    "id": f"{ds_extra['nfs_server']}:{ds_extra['nfs_path']}"
+                                })
+                            elif ds_extra.get('is_vsan'):
+                                group['hbas'].append({
+                                    "device": "vSAN Distributed", "type": "vsan",
+                                    "id": "vSAN Object Storage"
+                                })
+        
+        storage_tree = list(storage_groups.values())
             
     except Exception as e:
         logger.error(f"Error building trees for {vm_id}: {e}")

@@ -354,13 +354,28 @@
 
             <!-- Disk Row -->
             <div class="nic-row" style="gap: 1.5rem;">
-                {% for disk in storage_tree %}
+                {% for group in storage_tree %}
                 <div class="nic-branch">
-                    <!-- Disk Device -->
-                    <div class="topo-item">
-                        <span class="label">{{ disk.label }}</span>
-                        <i data-lucide="hard-drive" size="18" style="color: #6366f1;"></i>
-                        <span class="value">{{ disk.capacity_gb }} GB</span>
+                    <!-- Disk Devices (Pill style - similar to uplinks) -->
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                        <span class="label">Virtual Disks</span>
+                        <div class="uplink-pill" style="border-color: #6366f1; background: rgba(99, 102, 241, 0.05);">
+                            {% for disk in group.disks %}
+                            <div class="uplink-pill-item" style="padding: 0.5rem 1rem; min-width: 100px;">
+                                <div class="dev-name" style="color: #6366f1;">
+                                    <i data-lucide="hard-drive" size="12"></i>
+                                    <span>{{ disk.label }}</span>
+                                </div>
+                                <div
+                                    style="font-size: 0.65rem; color: var(--text-main); font-weight: 700; margin-top: 2px;">
+                                    {{ disk.capacity_gb }} GB
+                                </div>
+                            </div>
+                            {% if not loop.last %}
+                            <div style="width: 1px; background: rgba(99, 102, 241, 0.3);"></div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
                     </div>
 
                     <div class="topo-connector"></div>
@@ -369,16 +384,16 @@
                     <div class="topo-item" style="min-width: 160px;">
                         <span class="label">Datastore</span>
                         <i data-lucide="database" size="18" style="color: #10b981;"></i>
-                        <span class="value">{{ disk.datastore }}</span>
+                        <span class="value">{{ group.datastore }}</span>
                     </div>
 
-                    {% if disk.cluster %}
+                    {% if group.cluster %}
                     <div class="topo-connector"></div>
                     <!-- Datastore Cluster -->
                     <div class="topo-item">
                         <span class="label">Storage Cluster</span>
                         <i data-lucide="box" size="18" style="color: #3b82f6;"></i>
-                        <span class="value">{{ disk.cluster }}</span>
+                        <span class="value">{{ group.cluster }}</span>
                     </div>
                     {% endif %}
 
@@ -396,10 +411,10 @@
                         <div class="topo-connector" style="height: 12px; background: rgba(245, 158, 11, 0.4);"></div>
 
                         <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
-                            <span class="label" style="text-align: center;">{{ disk.connection_type }}</span>
+                            <span class="label" style="text-align: center;">{{ group.connection_type }}</span>
                             <div style="display: flex; flex-direction: column; gap: 4px;">
-                                {% if disk.hbas %}
-                                {% for hba in disk.hbas %}
+                                {% if group.hbas %}
+                                {% for hba in group.hbas %}
                                 <div class="uplink-pill" style="min-width: 200px; justify-content: center;">
                                     <div class="uplink-pill-item" style="padding: 0.4rem 1rem;">
                                         <div class="dev-name">

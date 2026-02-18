@@ -66,7 +66,7 @@
             </div>
         </div>
 
-        <div id="vms-content" style="display: flex; height: 600px; border-top: none;">
+        <div id="vms-content" style="display: flex; height: 600px; border-top: none; min-height: 600px;">
             <!-- Left Side: VM List -->
             <div class="inventory-list-pane" id="vm-list-pane"
                 style="flex: 1; border-right: 1px solid var(--border); overflow-y: auto; position: relative; transition: all 0.3s ease;">
@@ -92,6 +92,10 @@
                     <p>Select a virtual machine to view detailed information, networks, and snapshots.</p>
                 </div>
             </div>
+        </div>
+        <!-- Horizontal Resizer -->
+        <div id="vms-resizer" class="horizontal-resizer" title="Drag down to expand VM list">
+            <div class="resizer-handle-h"></div>
         </div>
     </section>
 
@@ -427,6 +431,40 @@
     #vm-list-pane.is-collapsed th {
         width: 100% !important;
     }
+
+    /* Horizontal Resizer */
+    .horizontal-resizer {
+        height: 10px;
+        background: transparent;
+        cursor: row-resize;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-top: 1px solid var(--border);
+        transition: all 0.2s;
+        user-select: none;
+    }
+
+    .horizontal-resizer:hover {
+        background: rgba(var(--primary-rgb), 0.05);
+    }
+
+    .horizontal-resizer.is-resizing {
+        background: rgba(var(--primary-rgb), 0.1) !important;
+    }
+
+    .resizer-handle-h {
+        width: 48px;
+        height: 4px;
+        background: var(--border);
+        border-radius: 2px;
+        transition: all 0.2s;
+    }
+
+    .horizontal-resizer:hover .resizer-handle-h {
+        width: 64px;
+        background: var(--primary);
+    }
 </style>
 {% endblock %}
 
@@ -545,5 +583,56 @@
             lucide.createIcons();
         }
     }
+
+    // VM Panel Resizing Logic
+    function initInventoryResizers() {
+        const resizer = document.getElementById('vms-resizer');
+        const content = document.getElementById('vms-content');
+
+        if (!resizer || !content) return;
+
+        // Load saved height
+        const savedHeight = localStorage.getItem('vms-panel-height');
+        if (savedHeight) {
+            content.style.height = savedHeight + 'px';
+        }
+
+        let startY, startHeight;
+
+        resizer.addEventListener('mousedown', function (e) {
+            startY = e.clientY;
+            startHeight = parseInt(document.defaultView.getComputedStyle(content).height, 10);
+            resizer.classList.add('is-resizing');
+
+            // Global overlay classes or just use document events
+            document.body.style.cursor = 'row-resize';
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+
+            e.preventDefault();
+        });
+
+        function onMouseMove(e) {
+            const delta = e.clientY - startY;
+            const newHeight = Math.max(600, startHeight + delta); // Min height 600
+            content.style.height = newHeight + 'px';
+        }
+
+        function onMouseUp() {
+            resizer.classList.remove('is-resizing');
+            document.body.style.cursor = 'default';
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+
+            // Save preferred height
+            localStorage.setItem('vms-panel-height', parseInt(content.style.height));
+        }
+    }
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', () => {
+        initInventoryResizers();
+    });
 </script>
 {% endblock %}
