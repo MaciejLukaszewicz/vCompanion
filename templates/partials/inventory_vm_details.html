@@ -23,7 +23,7 @@
         <h4><i data-lucide="server" size="14"></i> ESXi Host</h4>
         <div
             style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-weight: 600; color: var(--text-main);">
-            {{ vm.host }}
+            {{ vm.host.split('.')[0] }}
         </div>
     </div>
 
@@ -206,6 +206,48 @@
                 font-weight: 800;
                 text-transform: uppercase;
             }
+
+            .host-group {
+                background: rgba(245, 158, 11, 0.03);
+                border: 1px dashed rgba(245, 158, 11, 0.3);
+                padding: 1.25rem 1rem;
+                border-radius: 1.25rem;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 0.5rem;
+                margin-top: 0.25rem;
+            }
+
+            .uplink-pill {
+                display: flex;
+                background: rgba(var(--primary-rgb), 0.08);
+                border: 1px solid var(--primary);
+                border-radius: 0.75rem;
+                overflow: hidden;
+            }
+
+            .uplink-pill-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 2px;
+                padding: 0.35rem 0.75rem;
+                min-width: 80px;
+            }
+
+            .uplink-pill-item:not(:last-child) {
+                border-right: 1px solid var(--primary);
+            }
+
+            .uplink-pill-item .dev-name {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                color: var(--primary);
+                font-weight: 700;
+                font-size: 0.75rem;
+            }
         </style>
 
         <div class="topo-container">
@@ -254,37 +296,41 @@
 
                     <div class="topo-connector"></div>
 
-                    <!-- Host -->
-                    <div class="topo-item">
-                        <span class="label">ESXi Host</span>
-                        <i data-lucide="server" size="18" style="color: #f59e0b;"></i>
-                        <span class="value">{{ vm.host }}</span>
-                    </div>
+                    <!-- Host & Uplinks Group -->
+                    <div class="host-group">
+                        <!-- Host -->
+                        <div class="topo-item"
+                            style="box-shadow: none; border-color: rgba(245, 158, 11, 0.4); background: var(--panel-bg);">
+                            <span class="label">ESXi Host</span>
+                            <i data-lucide="server" size="18" style="color: #f59e0b;"></i>
+                            <span class="value">{{ vm.host.split('.')[0] }}</span>
+                        </div>
 
-                    <div class="topo-connector"></div>
+                        <div class="topo-connector" style="height: 12px; background: rgba(245, 158, 11, 0.4);"></div>
 
-                    <!-- Uplinks -->
-                    <div style="display: flex; flex-direction: column; align-items: center;">
-                        <span class="label">Physical Uplinks</span>
-                        <div class="uplink-container">
-                            {% for up in nic.uplinks %}
-                            <div class="uplink-tag"
-                                style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0.35rem 0.65rem;">
-                                <div style="display: flex; align-items: center; gap: 4px;">
-                                    <i data-lucide="cpu" size="10"></i>
-                                    <span>{% if up is mapping %}{{ up.device }}{% else %}{{ up }}{% endif %}</span>
+                        <!-- Uplinks -->
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span class="label" style="margin-bottom: 6px;">Physical Uplinks</span>
+                            <div class="uplink-pill">
+                                {% for up in nic.uplinks %}
+                                <div class="uplink-pill-item">
+                                    <div class="dev-name">
+                                        <i data-lucide="cpu" size="10"></i>
+                                        <span>{% if up is mapping %}{{ up.device }}{% else %}{{ up }}{% endif %}</span>
+                                    </div>
+                                    {% if up is mapping %}
+                                    <div
+                                        style="font-size: 0.55rem; font-family: monospace; color: var(--text-main); font-weight: 500;">
+                                        {{ up.mac }}</div>
+                                    {% endif %}
                                 </div>
-                                {% if up is mapping %}
-                                <div
-                                    style="font-size: 0.6rem; font-family: monospace; color: var(--text-main); font-weight: 500;">
-                                    {{ up.mac }}</div>
+                                {% endfor %}
+                                {% if not nic.uplinks %}
+                                <span
+                                    style="font-size: 0.75rem; color: var(--text-dim); font-style: italic; padding: 0.5rem 1rem;">No
+                                    Uplinks</span>
                                 {% endif %}
                             </div>
-                            {% endfor %}
-                            {% if not nic.uplinks %}
-                            <span style="font-size: 0.75rem; color: var(--text-dim); font-style: italic;">No
-                                Uplinks</span>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -340,22 +386,23 @@
 
                     <!-- Host Availability -->
                     <div style="display: flex; flex-direction: column; align-items: center;">
-                        <span class="label">Accessible By Hosts</span>
-                        <div class="uplink-container"
-                            style="flex-wrap: wrap; justify-content: center; max-width: 250px;">
+                        <span class="label" style="margin-bottom: 6px;">Accessible By Hosts</span>
+                        <div class="uplink-pill" style="background: rgba(16, 185, 129, 0.05); border-color: #10b981;">
                             {% for host in disk.hosts[:4] %}
-                            <div class="uplink-tag"
-                                style="background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981;">{{
-                                host }}</div>
+                            <div class="uplink-pill-item"
+                                style="border-right-color: #10b981; min-width: 60px; padding: 0.25rem 0.6rem;">
+                                <div style="color: #10b981; font-weight: 700; font-size: 0.75rem;">{{ host.split('.')[0]
+                                    }}</div>
+                            </div>
                             {% endfor %}
                             {% if disk.hosts|length > 4 %}
-                            <div class="uplink-tag"
-                                style="background: rgba(255, 255, 255, 0.05); border-color: var(--border); color: var(--text-dim);">
-                                +{{ disk.hosts|length - 4 }} more</div>
+                            <div class="uplink-pill-item"
+                                style="color: var(--text-dim); font-size: 0.7rem; justify-content: center;">+{{
+                                disk.hosts|length - 4 }}</div>
                             {% endif %}
                             {% if not disk.hosts %}
                             <span
-                                style="font-size: 0.75rem; color: var(--text-dim); font-style: italic;">Standalone/Local</span>
+                                style="font-size: 0.75rem; color: var(--text-dim); font-style: italic; padding: 0.4rem 0.8rem;">Standalone/Local</span>
                             {% endif %}
                         </div>
                     </div>
