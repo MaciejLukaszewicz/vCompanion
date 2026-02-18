@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
 @router.get("/vms")
-async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = False):
+async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = False, selected_vm_id: str = None, selected_vcenter_id: str = None):
     """Returns the VM list partial for the inventory page with filtering."""
     require_auth(request)
     if not hasattr(request.app.state, 'vcenter_manager'):
@@ -69,7 +69,9 @@ async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = Fals
     from main import templates
     return templates.TemplateResponse("partials/inventory_vms_list.html", {
         "request": request,
-        "vms": vms
+        "vms": vms,
+        "selected_vm_id": selected_vm_id,
+        "selected_vcenter_id": selected_vcenter_id
     })
 
 @router.get("/vm-details/{vcenter_id}/{vm_id}")

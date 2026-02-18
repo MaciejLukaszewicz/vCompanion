@@ -11,9 +11,10 @@
     <tbody>
         {% if vms %}
         {% for vm in vms %}
-        <tr class="vm-row vc-color-{{ vm.vc_color_index }}" data-vcenter-id="{{ vm.vcenter_id }}"
-            data-vm-id="{{ vm.id }}" hx-get="/api/inventory/vm-details/{{ vm.vcenter_id }}/{{ vm.id }}"
-            hx-target="#vm-details-panel" hx-trigger="click">
+        <tr class="vm-row vc-color-{{ vm.vc_color_index }} {{ 'selected' if vm.id == selected_vm_id and vm.vcenter_id == selected_vcenter_id else '' }}"
+            data-vcenter-id="{{ vm.vcenter_id }}" data-vm-id="{{ vm.id }}"
+            hx-get="/api/inventory/vm-details/{{ vm.vcenter_id }}/{{ vm.id }}" hx-target="#vm-details-panel"
+            hx-trigger="click">
             <td style="font-weight: 600; color: var(--text-main);">{{ vm.name }}</td>
             <td style="font-size: 0.75rem; color: var(--text-dim);" class="hidable">{{ vm.vcenter_name }}</td>
             <td style="font-family: monospace; font-size: 0.85rem;" class="hidable">{{ vm.ip or '--' }}</td>

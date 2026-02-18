@@ -28,12 +28,17 @@
                     hx-get="/api/inventory/vms" hx-target="#vm-list-target"
                     hx-trigger="change, keyup delay:300ms from:#vm-search">
 
+                    <!-- Hidden inputs to preserve selection state -->
+                    <input type="hidden" name="selected_vm_id" id="selected-vm-id">
+                    <input type="hidden" name="selected_vcenter_id" id="selected-vcenter-id">
+
                     <!-- Global Search -->
                     <div style="position: relative; flex: 1;">
                         <i data-lucide="search" size="14"
                             style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-dim);"></i>
                         <input type="text" id="vm-search" name="q"
                             placeholder="Search by Name, IP, vCenter, Host, Snapshot..."
+                            onfocus="window.isSearchFocused = true" onblur="window.isSearchFocused = false"
                             style="width: 100%; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 2.5rem 0.4rem 2.25rem; font-size: 0.85rem; color: var(--text-main);">
                         <!-- Clear Search Button -->
                         <div id="clear-search" onclick="clearVmSearch()"
@@ -70,7 +75,8 @@
             <!-- Left Side: VM List -->
             <div class="inventory-list-pane" id="vm-list-pane"
                 style="flex: 1; border-right: 1px solid var(--border); overflow-y: auto; position: relative; transition: all 0.3s ease;">
-                <div id="vm-list-target" hx-get="/api/inventory/vms" hx-trigger="load, vcenter-refreshed from:body">
+                <div id="vm-list-target" hx-get="/api/inventory/vms" hx-include="#vm-filters"
+                    hx-trigger="load, vcenter-refreshed[!window.isSearchFocused] from:body">
                     <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
                         <div class="spinner-small" style="margin-bottom: 1rem;"></div>
                         Loading virtual machines...
@@ -489,6 +495,10 @@
         if (vmRow) {
             document.querySelectorAll('.vm-row').forEach(r => r.classList.remove('selected'));
             vmRow.classList.add('selected');
+
+            // Sync hidden inputs for refresh preservation
+            document.getElementById('selected-vm-id').value = vmRow.getAttribute('data-vm-id');
+            document.getElementById('selected-vcenter-id').value = vmRow.getAttribute('data-vcenter-id');
         }
         const hostRow = e.target.closest('.host-row');
         if (hostRow) {
@@ -632,6 +642,7 @@
 
     // Initialize on load
     document.addEventListener('DOMContentLoaded', () => {
+        window.isSearchFocused = false;
         initInventoryResizers();
     });
 </script>
