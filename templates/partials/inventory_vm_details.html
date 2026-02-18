@@ -108,13 +108,13 @@
             .topo-container {
                 display: flex;
                 flex-direction: column;
-                align-items: center;
                 gap: 0.5rem;
                 padding: 1.5rem;
                 background: rgba(0, 0, 0, 0.1);
                 border-radius: 1rem;
                 border: 1px solid var(--border);
                 overflow-x: auto;
+                width: 100%;
             }
 
             .topo-item {
@@ -127,6 +127,8 @@
                 border: 1px solid var(--border);
                 border-radius: 0.75rem;
                 min-width: 140px;
+                width: max-content;
+                margin: 0 auto;
                 position: relative;
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             }
@@ -161,20 +163,21 @@
                 width: 2px;
                 height: 20px;
                 background: linear-gradient(to bottom, var(--primary), var(--border));
+                margin: 0 auto;
             }
 
             .nic-row {
                 display: flex;
                 gap: 2rem;
-                justify-content: center;
-                width: 100%;
+                width: max-content;
+                margin: 0 auto;
+                min-width: 0;
             }
 
             .nic-branch {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                flex: 1;
                 min-width: 200px;
             }
 
@@ -404,18 +407,18 @@
                     <div class="topo-connector"></div>
 
                     <!-- Datastore -->
-                    <div class="topo-item" style="min-width: 160px;">
+                    <div class="topo-item" style="width: 100%; max-width: none;">
                         <span class="label">Datastore</span>
-                        <i data-lucide="database" size="18" style="color: #10b981;"></i>
-                        <span class="value">{{ group.datastore }}</span>
+                        <i data-lucide="database" size="22" style="color: #10b981;"></i>
+                        <span class="value" style="font-size: 1rem;">{{ group.datastore }}</span>
                     </div>
 
                     {% if group.cluster %}
                     <div class="topo-connector"></div>
                     <!-- Datastore Cluster -->
-                    <div class="topo-item">
+                    <div class="topo-item" style="width: 100%; max-width: none;">
                         <span class="label">Storage Cluster</span>
-                        <i data-lucide="box" size="18" style="color: #3b82f6;"></i>
+                        <i data-lucide="box" size="22" style="color: #3b82f6;"></i>
                         <span class="value">{{ group.cluster }}</span>
                     </div>
                     {% endif %}
@@ -423,9 +426,9 @@
                     <div class="topo-connector"></div>
 
                     <!-- Host & HBA Path (Active Path) -->
-                    <div class="host-group">
+                    <div class="host-group" style="width: 100%;">
                         <div class="topo-item"
-                            style="box-shadow: none; border-color: rgba(245, 158, 11, 0.4); background: var(--panel-bg);">
+                            style="width: 100%; box-shadow: none; border-color: rgba(245, 158, 11, 0.4); background: var(--panel-bg);">
                             <span class="label">Running On Host</span>
                             <i data-lucide="server" size="18" style="color: #f59e0b;"></i>
                             <span class="value">{{ vm.host.split('.')[0] }}</span>
