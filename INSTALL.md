@@ -1,150 +1,176 @@
-# 🛠️ Installation Guide for vCompanion
+# 🛠️ Installation Guide — vCompanion
 
-This guide provides detailed instructions for installing and configuring vCompanion on different platforms.
+This guide provides step-by-step instructions for installing and running vCompanion on Windows.
+
+---
 
 ## Prerequisites
 
-Before starting, ensure you have the following installed:
+Before starting, ensure you have the following:
 
-1.  **Git**: For cloning the repository. [Download Git](https://git-scm.com/downloads)
-2.  **Python 3.12+**: The application requires Python 3.12 or newer. [Download Python](https://www.python.org/downloads/)
-    *   *Windows users*: Ensure you check "Add Python to PATH" during installation.
+1. **Git** — for cloning the repository. [Download Git](https://git-scm.com/downloads)
+2. **Python 3.12+** — the application requires Python 3.12 or newer. [Download Python](https://www.python.org/downloads/)
+   - *Windows*: Check **"Add Python to PATH"** during installation.
 
 ---
 
 ## 1. Clone the Repository
 
-Open your terminal (Command Prompt, PowerShell, or Bash) and run:
+Open PowerShell or Command Prompt and run:
 
-```bash
+```powershell
 git clone https://github.com/MaciejLukaszewicz/vCompanion.git
 cd vCompanion
 ```
 
 ---
 
-## 2. Automated Setup (Windows)
+## 2. Run Setup (Windows)
 
-vCompanion includes a setup script for Windows that handles virtual environment creation and dependency installation.
+```powershell
+.\setup\setup.bat
+```
 
-1.  Run the setup script:
-    ```powershell
-    .\setup\setup.bat
-    ```
-2.  The script will:
-    *   Create a virtual environment (`venv`)
-    *   Upgrade `pip`
-    *   Install all required packages from `requirements.txt`
-    *   Create a default `config/config.json` if one doesn't exist
+The script will:
+- Create a Python virtual environment (`venv/`)
+- Upgrade `pip`
+- Install all required packages from `requirements.txt`
+
+> **Note:** `config/config.json` is **not** included in the repository. It will be created automatically with default values on the first run of the application.
 
 ---
 
-## 3. Manual Setup (Linux / Mac / Manual Windows)
+## 3. Manual Setup (Linux / macOS)
 
-If you prefer manual installation or are using Linux/macOS:
+If you prefer manual installation or are on Linux/macOS:
 
-1.  **Create a virtual environment**:
-    ```bash
-    python -m venv venv
-    ```
-
-2.  **Activate the virtual environment**:
-    *   **Windows**:
-        ```powershell
-        .\venv\Scripts\activate
-        ```
-    *   **Linux/macOS**:
-        ```bash
-        source venv/bin/activate
-        ```
-
-3.  **Install dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  **Create Configuration**:
-    Copy the example configuration to the config directory:
-    ```bash
-    cp config/config.example.json config/config.json
-    # Or create it manually
-    ```
+```bash
+python -m venv venv
+source venv/bin/activate       # Windows: .\venv\Scripts\activate
+pip install -r requirements.txt
+```
 
 ---
 
 ## 4. Configuration
 
-Edit `config/config.json` to add your vCenter servers.
-
-**Example `config.json`**:
+On first launch, `config/config.json` is created automatically with sensible defaults and one example vCenter entry. Edit it to match your environment:
 
 ```json
 {
-  "vcenters": [
-    {
-      "id": "vc1",
-      "name": "Production vCenter",
-      "host": "vcenter-prod.example.com",
-      "port": 443,
-      "verify_ssl": false
-    },
-    {
-      "id": "vc2",
-      "name": "DR vCenter",
-      "host": "vcenter-dr.example.com",
-      "port": 443,
-      "verify_ssl": false
-    }
-  ],
   "app_settings": {
     "title": "vCompanion",
-    "theme": "dark",
+    "session_timeout": 3600,
+    "log_level": "ERROR",
+    "log_to_file": false,
+    "refresh_interval_seconds": 120,
+    "theme": "light",
     "accent_color": "blue",
-    "default_refresh_interval": 60,
-    "session_timeout": 3600
-  }
+    "port": 8000,
+    "open_browser_on_start": true
+  },
+  "vcenters": [
+    {
+      "id": "prod",
+      "name": "Production",
+      "host": "vcenter-prod.example.com",
+      "port": 443,
+      "verify_ssl": false,
+      "enabled": true,
+      "refresh_interval": 180
+    }
+  ]
 }
 ```
 
-### Configuration Options
+### Configuration Reference
 
-*   **vcenters**: List of vCenter server objects.
-    *   `id`: Unique identifier (string).
-    *   `name`: Display name.
-    *   `host`: FQDN or IP address.
-    *   `port`: (Optional) HTTPS port, default 443.
-    *   `verify_ssl`: (Optional) Set to `true` to verify SSL certificates, `false` to ignore self-signed warnings.
-*   **app_settings**: Global application settings.
-    *   `theme`: `dark` (default) or `light`.
-    *   `accent_color`: `blue`, `purple`, `green`, `orange`, or `red`.
-    *   `session_timeout`: Inactivity timeout in seconds.
+#### `app_settings`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `title` | string | `"vCompanion"` | Application name shown in the UI |
+| `session_timeout` | int | `3600` | Inactivity timeout in seconds |
+| `log_level` | string | `"ERROR"` | Logging verbosity: `DEBUG`, `INFO`, `ERROR` |
+| `log_to_file` | bool | `false` | Write logs to `log.txt` |
+| `refresh_interval_seconds` | int | `120` | Global background refresh interval |
+| `theme` | string | `"light"` | UI theme: `"light"` or `"dark"` |
+| `accent_color` | string | `"blue"` | Accent color: `"blue"`, `"purple"`, `"emerald"`, `"orange"` |
+| `port` | int | `8000` | TCP port the server listens on |
+| `open_browser_on_start` | bool | `true` | Automatically open browser on startup |
+
+#### `vcenters[]`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | ✅ | Unique identifier (used internally) |
+| `name` | string | ✅ | Display name shown in the UI |
+| `host` | string | ✅ | FQDN or IP address of the vCenter |
+| `port` | int | | HTTPS port, default `443` |
+| `verify_ssl` | bool | | Verify SSL certificate, default `false` |
+| `enabled` | bool | | Include in connections, default `true` |
+| `refresh_interval` | int | | Per-vCenter refresh interval in seconds |
+
+> **Tip:** All settings can also be managed through the **Settings** panel in the web UI after logging in.
 
 ---
 
 ## 5. Running the Application
 
-### Windows (Automated)
-
-Double-click `run.bat` or execute in terminal:
+### Windows (recommended)
 
 ```powershell
-.\setup\run.bat
+.\run.bat
 ```
 
-### Manual Start
+The browser opens automatically at `http://localhost:8000`.
+
+### Manual start
 
 With the virtual environment activated:
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+python main.py
+```
+
+Or directly with uvicorn:
+
+```bash
+uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
 ---
 
-## 6. Accessing the Dashboard
+## 6. First Login
 
-Open your web browser and navigate to:
+1. Navigate to `http://localhost:8000`
+2. Enter your **vCenter credentials** (Active Directory or SSO account)
+3. Select which vCenters to connect to
+4. Click **Login** — the dashboard loads immediately from cache and refreshes in the background
 
-[http://localhost:8000](http://localhost:8000)
+> **Security note:** Your password is never stored on disk or in cookies. It is used only to derive an in-memory encryption key and authenticate against vCenter.
 
-Login with your Active Directory or SSO credentials. These credentials are unrelated to the application itself; they are passed directly to vCenter for authentication.
+---
+
+## 7. Updating
+
+To pull the latest version:
+
+```powershell
+.\setup\update.bat
+```
+
+This runs `git pull` and reinstalls any updated dependencies.
+
+---
+
+## 8. Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| `Python not found` | Ensure Python 3.12+ is installed and added to PATH |
+| `Cannot connect to vCenter` | Check network connectivity and firewall rules on port 443 |
+| `Session expires immediately` | Restart the application — the previous session cookie is stale |
+| `Port already in use` | Change `port` in `config.json` or stop the conflicting process |
+| `SSL errors` | Set `"verify_ssl": false` for self-signed certificates |
+| `Blank dashboard` | Wait for the background refresh to complete (first run takes ~30s) |

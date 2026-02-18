@@ -46,15 +46,22 @@ def load_config(path: str = None) -> Config:
                 "title": "vCompanion",
                 "session_timeout": 3600,
                 "log_level": "ERROR",
-                "port": 8000
+                "log_to_file": False,
+                "refresh_interval_seconds": 120,
+                "theme": "light",
+                "accent_color": "blue",
+                "port": 8000,
+                "open_browser_on_start": True
             },
             "vcenters": [
                 {
-                    "id": "example-vc",
-                    "name": "Example vCenter",
-                    "host": "vcenter.example.com",
+                    "id": "vCenter1",
+                    "name": "vCenter1",
+                    "host": "vCenter1.local",
                     "port": 443,
-                    "verify_ssl": False
+                    "verify_ssl": False,
+                    "enabled": True,
+                    "refresh_interval": 180
                 }
             ]
         }
