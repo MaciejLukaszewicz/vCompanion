@@ -384,26 +384,48 @@
 
                     <div class="topo-connector"></div>
 
-                    <!-- Host Availability -->
-                    <div style="display: flex; flex-direction: column; align-items: center;">
-                        <span class="label" style="margin-bottom: 6px;">Accessible By Hosts</span>
-                        <div class="uplink-pill" style="background: rgba(16, 185, 129, 0.05); border-color: #10b981;">
-                            {% for host in disk.hosts[:4] %}
-                            <div class="uplink-pill-item"
-                                style="border-right-color: #10b981; min-width: 60px; padding: 0.25rem 0.6rem;">
-                                <div style="color: #10b981; font-weight: 700; font-size: 0.75rem;">{{ host.split('.')[0]
-                                    }}</div>
+                    <!-- Host & HBA Path (Active Path) -->
+                    <div class="host-group">
+                        <div class="topo-item"
+                            style="box-shadow: none; border-color: rgba(245, 158, 11, 0.4); background: var(--panel-bg);">
+                            <span class="label">Running On Host</span>
+                            <i data-lucide="server" size="18" style="color: #f59e0b;"></i>
+                            <span class="value">{{ vm.host.split('.')[0] }}</span>
+                        </div>
+
+                        <div class="topo-connector" style="height: 12px; background: rgba(245, 158, 11, 0.4);"></div>
+
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                            <span class="label" style="text-align: center;">{{ disk.connection_type }}</span>
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                {% if disk.hbas %}
+                                {% for hba in disk.hbas %}
+                                <div class="uplink-pill" style="min-width: 200px; justify-content: center;">
+                                    <div class="uplink-pill-item" style="padding: 0.4rem 1rem;">
+                                        <div class="dev-name">
+                                            <i data-lucide="cpu" size="10"></i>
+                                            <span>{{ hba.device }}</span>
+                                            <span class="type-badge"
+                                                style="position: relative; top: 0; right: 0; font-size: 0.5rem; background: var(--primary); color: white;">{{
+                                                hba.type }}</span>
+                                        </div>
+                                        <div
+                                            style="font-size: 0.55rem; font-family: monospace; color: var(--text-main); font-weight: 500; margin-top: 2px;">
+                                            {{ hba.id }}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                {% else %}
+                                <div class="uplink-pill"
+                                    style="min-width: 200px; background: rgba(239, 68, 68, 0.05); border-color: var(--danger);">
+                                    <div class="uplink-pill-item"
+                                        style="color: var(--danger); font-size: 0.75rem; font-style: italic; font-weight: 600;">
+                                        Local / Direct Attached
+                                    </div>
+                                </div>
+                                {% endif %}
                             </div>
-                            {% endfor %}
-                            {% if disk.hosts|length > 4 %}
-                            <div class="uplink-pill-item"
-                                style="color: var(--text-dim); font-size: 0.7rem; justify-content: center;">+{{
-                                disk.hosts|length - 4 }}</div>
-                            {% endif %}
-                            {% if not disk.hosts %}
-                            <span
-                                style="font-size: 0.75rem; color: var(--text-dim); font-style: italic; padding: 0.4rem 0.8rem;">Standalone/Local</span>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
