@@ -203,6 +203,18 @@ class VCenterManager:
         all_tasks.sort(key=lambda x: x['start_time'] if x['start_time'] else "", reverse=True)
         return all_tasks
 
+    def toggle_host_service(self, vc_id, host_mo_id, service_key, start=True):
+        """Delegates service toggle to the correct vCenter connection and triggers a refresh."""
+        if vc_id not in self.connections: return False
+        conn = self.connections[vc_id]
+        if not conn.is_alive(): return False
+        
+        success = conn.toggle_host_service(host_mo_id, service_key, start)
+        if success:
+            # Trigger background refresh to update the cache status
+            self.trigger_refresh(vc_id)
+        return success
+
 class VCenterConnection:
     def __init__(self, config: VCenterConfig):
         self.config = config
@@ -422,7 +434,7 @@ class VCenterConnection:
                 "config.network.vnic", "config.network.pnic", 
                 "config.network.vswitch", "config.network.proxySwitch",
                 "config.virtualNicManagerInfo.netConfig",
-                "datastore"
+                "datastore", "config.service.service"
             ]
             
             spec = vim.PropertyFilterSpec(
@@ -449,6 +461,7 @@ class VCenterConnection:
                     "boot_time": p_dict.get("runtime.bootTime").isoformat() if p_dict.get("runtime.bootTime") else None,
                     "power_state": p_dict.get("runtime.powerState", "Unknown"),
                     "in_maintenance": p_dict.get("runtime.inMaintenanceMode", False),
+                    "ssh_enabled": False,
                     "cpu_cores": p_dict.get("summary.hardware.numCpuCores", 0),
                     "cpu_mhz": p_dict.get("summary.hardware.cpuMhz", 0),
                     "memory_total_mb": int(p_dict.get("summary.hardware.memorySize", 0) / (1024*1024)),
@@ -457,6 +470,13 @@ class VCenterConnection:
                     "pnics": [],
                     "datastores": []
                 }
+                
+                # Extract SSH status
+                services = p_dict.get("config.service.service", [])
+                for svc in services:
+                    if svc.key == 'TSM-SSH':
+                        d["ssh_enabled"] = svc.running
+                        break
                 
                 # Map services to vNICs
                 vnic_to_services = {}
@@ -521,6 +541,21 @@ class VCenterConnection:
         except Exception as e:
             logger.error(f"Error fetching hosts: {e}")
             return []
+
+    def toggle_host_service(self, host_mo_id, service_key, start=True):
+        """Starts or stops a service on a specific host."""
+        if not self.content: return False
+        try:
+            host = vim.HostSystem(host_mo_id, stub=self.content.sessionManager._stub)
+            service_system = host.configManager.serviceSystem
+            if start:
+                service_system.StartService(id=service_key)
+            else:
+                service_system.StopService(id=service_key)
+            return True
+        except Exception as e:
+            logger.error(f"Error toggling service {service_key} on host {host_mo_id}: {e}")
+            return False
 
     def get_clusters(self):
         """Fetch compute clusters with aggregated resource stats."""

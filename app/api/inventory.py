@@ -349,6 +349,35 @@ async def get_host_details(request: Request, vcenter_id: str, mo_id: str):
         "request": request,
         "host": host
     })
+
+@router.post("/host-service")
+async def toggle_host_service(request: Request):
+    """
+    Toggles a service on an ESXi host.
+    CRITICAL: This operation requires elevated permissions (to be implemented).
+    """
+    require_auth(request)
+    try:
+        data = await request.json()
+        vc_id = data.get('vcenter_id')
+        mo_id = data.get('mo_id')
+        service = data.get('service')
+        state = data.get('state') # "start" or "stop"
+        
+        if not all([vc_id, mo_id, service, state]):
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+            
+        manager = request.app.state.vcenter_manager
+        success = manager.toggle_host_service(vc_id, mo_id, service, start=(state == "start"))
+        
+        if success:
+            return JSONResponse({"success": True})
+        else:
+            return JSONResponse({"success": False, "error": "Failed to toggle service. Check vCenter connection or host permissions."}, status_code=500)
+            
+    except Exception as e:
+        logger.error(f"Error in host-service endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 @router.get("/snapshots")
 async def get_snapshots_partial(request: Request, today_only: bool = False):
     """Returns a global list of snapshots across all vCenters."""
