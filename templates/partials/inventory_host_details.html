@@ -1,6 +1,19 @@
+<style>
+    .maintenance-header {
+        background: repeating-linear-gradient(45deg,
+                rgba(239, 68, 68, 0.05),
+                rgba(239, 68, 68, 0.05) 20px,
+                rgba(245, 158, 11, 0.05) 20px,
+                rgba(245, 158, 11, 0.05) 40px) !important;
+        border-radius: 0.75rem 0.75rem 0 0;
+        margin: -2rem -2rem 2rem -2rem;
+        padding: 2rem !important;
+    }
+</style>
+
 <div style="padding: 2rem; animation: fadeIn 0.3s ease-out;">
     <!-- Header with FQDN splitting -->
-    <div
+    <div class="{{ 'maintenance-header' if host.in_maintenance else '' }}"
         style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem;">
         <div>
             <h2
@@ -10,8 +23,17 @@
                 host.domain }}</div>
 
             <div style="display: flex; align-items: center; gap: 0.75rem; color: var(--text-dim); font-size: 0.875rem;">
-                <span class="status-badge {{ 'success' if host.power_state == 'poweredOn' else 'error' }}">{{
-                    host.power_state }}</span>
+                {% if host.in_maintenance %}
+                <span class="status-badge warning"
+                    style="background: var(--warning); color: #000; display: flex; align-items: center; gap: 4px;">
+                    <i data-lucide="alert-triangle" size="12"></i>
+                    MAINTENANCE MODE
+                </span>
+                {% else %}
+                <span class="status-badge {{ 'success' if host.power_state == 'poweredOn' else 'error' }}">
+                    {{ host.power_state }}
+                </span>
+                {% endif %}
                 <span>•</span>
                 <span>{{ host.vcenter_name }}</span>
             </div>

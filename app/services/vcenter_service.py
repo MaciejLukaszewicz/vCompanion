@@ -416,7 +416,7 @@ class VCenterConnection:
             
             paths = [
                 "name", "config.product.version", "config.product.build", 
-                "runtime.bootTime", "runtime.powerState",
+                "runtime.bootTime", "runtime.powerState", "runtime.inMaintenanceMode",
                 "summary.hardware.numCpuCores", "summary.hardware.cpuMhz", "summary.hardware.memorySize",
                 "summary.quickStats.overallCpuUsage", "summary.quickStats.overallMemoryUsage",
                 "config.network.vnic", "config.network.pnic", 
@@ -448,6 +448,7 @@ class VCenterConnection:
                     "build": p_dict.get("config.product.build", "N/A"),
                     "boot_time": p_dict.get("runtime.bootTime").isoformat() if p_dict.get("runtime.bootTime") else None,
                     "power_state": p_dict.get("runtime.powerState", "Unknown"),
+                    "in_maintenance": p_dict.get("runtime.inMaintenanceMode", False),
                     "cpu_cores": p_dict.get("summary.hardware.numCpuCores", 0),
                     "cpu_mhz": p_dict.get("summary.hardware.cpuMhz", 0),
                     "memory_total_mb": int(p_dict.get("summary.hardware.memorySize", 0) / (1024*1024)),
