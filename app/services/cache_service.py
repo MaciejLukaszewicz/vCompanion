@@ -193,6 +193,7 @@ class CacheService:
         # Calculate totals from the full lists of fetched data
         total_vms = len(vms)
         total_hosts = len(hosts)
+        total_maintenance = sum(1 for h in hosts if h.get('in_maintenance'))
         powered_on = sum(1 for vm in vms if vm.get('power_state') == 'poweredOn')
         total_snapshots = sum(vm.get('snapshot_count', 0) for vm in vms)
         
@@ -211,7 +212,7 @@ class CacheService:
                 per_vcenter[vc_id] = {
                     "name": status.get('name'), 
                     "connected": status.get('status') == 'READY', 
-                    "vms": 0, "vms_on": 0, "hosts": 0, "snapshots": 0,
+                    "vms": 0, "vms_on": 0, "hosts": 0, "hosts_maint": 0, "snapshots": 0,
                     "critical": 0, "warning": 0
                 }
         
@@ -224,7 +225,9 @@ class CacheService:
         
         for host in hosts:
             vc_id = host.get('vcenter_id')
-            if vc_id in per_vcenter: per_vcenter[vc_id]["hosts"] += 1
+            if vc_id in per_vcenter: 
+                per_vcenter[vc_id]["hosts"] += 1
+                if host.get('in_maintenance'): per_vcenter[vc_id]["hosts_maint"] += 1
             
         for alert in alerts:
             vc_id = alert.get('vcenter_id')
@@ -237,6 +240,7 @@ class CacheService:
             "powered_on_vms": powered_on,
             "snapshot_count": total_snapshots,
             "host_count": total_hosts,
+            "maintenance_hosts": total_maintenance,
             "critical_alerts": total_critical,
             "warning_alerts": total_warning,
             "per_vcenter": per_vcenter,

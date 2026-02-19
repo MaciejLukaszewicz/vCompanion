@@ -76,13 +76,21 @@ async def get_stats_cards(request: Request):
         stats_data = vcenter_manager.get_stats()
         
         has_data = stats_data.get('has_data', False)
+        h_count = stats_data.get('host_count', 0)
+        m_count = stats_data.get('maintenance_hosts', 0)
+        h_status = f"{h_count} host(s)"
+        if has_data and m_count > 0:
+            h_status = f"{h_count} host(s) ({m_count} maintenance)"
+        elif not has_data:
+            h_status = "No data"
+
         stats = {
             'total_vms': f"{stats_data['total_vms']:,}" if isinstance(stats_data['total_vms'], int) else stats_data['total_vms'],
             'vms_delta': f"{stats_data['powered_on_vms']} powered on" if has_data else "No data",
             'snapshots': str(stats_data['snapshot_count']),
             'snapshots_delta': f"{stats_data['snapshot_count']} active" if has_data else "No data",
             'clusters': str(stats_data['host_count']),
-            'clusters_status': f"{stats_data['host_count']} host(s)" if has_data else "No data",
+            'clusters_status': h_status,
             'critical_alerts': stats_data.get('critical_alerts', 0),
             'warning_alerts': stats_data.get('warning_alerts', 0)
         }

@@ -45,7 +45,13 @@
         {% for vc_id, vc in per_vcenter_stats.items() %}
         <div class="breakdown-item">
             <span>{{ vc.name }}</span>
-            <strong>{{ vc.hosts }}</strong>
+            <strong>
+                {{ vc.hosts }}
+                {% if vc.hosts_maint > 0 %}
+                <span style="font-size: 0.65rem; color: var(--warning); font-weight: 500;">({{ vc.hosts_maint }}
+                    maint)</span>
+                {% endif %}
+            </strong>
         </div>
         {% endfor %}
     </div>
