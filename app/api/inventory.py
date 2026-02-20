@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
-from app.core.session import require_auth
+from app.core.session import require_auth, is_elevated_unlocked
 import logging
 import csv
 import io
@@ -347,7 +347,8 @@ async def get_host_details(request: Request, vcenter_id: str, mo_id: str):
     from main import templates
     return templates.TemplateResponse("partials/inventory_host_details.html", {
         "request": request,
-        "host": host
+        "host": host,
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
 
 @router.post("/host-service")
@@ -661,7 +662,8 @@ async def get_vcenters_partial(request: Request):
     from main import templates
     return templates.TemplateResponse("partials/inventory_vcenters_list.html", {
         "request": request,
-        "vcenters": vcenter_statuses
+        "vcenters": vcenter_statuses,
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
 
 @router.get("/networks")

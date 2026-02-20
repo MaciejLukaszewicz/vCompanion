@@ -37,15 +37,18 @@
                     <!-- Privileged Services Sub-card (Same as Host) -->
                     <div
                         style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.35rem 0.6rem; border-radius: 0.4rem; display: flex; align-items: center; gap: 0.75rem; width: fit-content;">
-                        <i data-lucide="shield-alert" size="14" style="color: var(--danger); opacity: 0.8;"
-                            title="Privileged Operation"></i>
+                        <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}" size="14"
+                            style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }}; opacity: 0.8;"
+                            title="{{ 'Elevated Privileges Unlocked' if elevated_unlocked else 'Elevated Privileges Locked - go to Settings to unlock' }}"></i>
 
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-main);">SSH</span>
-                            <label class="switch-sm" style="width: 28px; height: 16px;">
+                            <label class="switch-sm {{ '' if elevated_unlocked else 'disabled' }}"
+                                style="width: 28px; height: 16px;">
                                 <input type="checkbox" id="ssh-toggle-vc-{{ vc.id }}"
                                     data-initial-state="{{ 'enabled' if vc.ssh_enabled == True else ('disabled' if vc.ssh_enabled == False else 'unknown') }}"
-                                    {% if vc.ssh_enabled==True %}checked{% endif %}
+                                    {% if vc.ssh_enabled==True %}checked{% endif %} {{ '' if elevated_unlocked
+                                    else 'disabled' }}
                                     onchange="window.toggleVCenterService('{{ vc.id }}', this.checked, '{{ vc.name|e }}')">
                                 <span class="slider-sm" style="border-radius: 16px;"></span>
                             </label>

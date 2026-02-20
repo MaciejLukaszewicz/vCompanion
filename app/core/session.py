@@ -12,6 +12,7 @@ SESSION_KEY_USERNAME = "username"
 # PASSWORD IS NO LONGER STORED IN SESSION FOR SECURITY (ZERO-PASSWORD-STORAGE)
 SESSION_KEY_LAST_ACTIVITY = "last_activity"
 SESSION_KEY_CONNECTED_VCENTERS = "connected_vcenters"
+SESSION_KEY_ELEVATED_LOCKED = "elevated_locked"
 
 def is_authenticated(request: Request) -> bool:
     """Check if the current session is authenticated."""
@@ -58,6 +59,7 @@ def set_session_credentials(request: Request, username: str):
     request.session[SESSION_KEY_USERNAME] = username
     request.session[SESSION_KEY_LAST_ACTIVITY] = datetime.now().isoformat()
     request.session[SESSION_KEY_CONNECTED_VCENTERS] = []
+    request.session[SESSION_KEY_ELEVATED_LOCKED] = True
 
 def clear_session(request: Request):
     """Clear all session data and lock cache if manager exists."""
@@ -84,3 +86,11 @@ def set_connected_vcenters(request: Request, vcenter_ids: list[str], merge: bool
         request.session[SESSION_KEY_CONNECTED_VCENTERS] = combined
     else:
         request.session[SESSION_KEY_CONNECTED_VCENTERS] = vcenter_ids
+
+def is_elevated_unlocked(request: Request) -> bool:
+    """Check if elevated privileges are unlocked for the session."""
+    return not request.session.get(SESSION_KEY_ELEVATED_LOCKED, True)
+
+def set_elevated_locked(request: Request, locked: bool):
+    """Set the lock state for elevated privileges."""
+    request.session[SESSION_KEY_ELEVATED_LOCKED] = locked

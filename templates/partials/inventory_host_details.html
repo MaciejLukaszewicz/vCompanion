@@ -95,14 +95,15 @@
             <!-- Privileged Services Sub-card -->
             <div
                 style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.4rem 0.75rem; border-radius: 0.5rem; display: flex; align-items: center; gap: 0.75rem; width: fit-content;">
-                <i data-lucide="shield-alert" size="14" style="color: var(--danger); opacity: 0.8;"
-                    title="Privileged Operation"></i>
+                <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}" size="14"
+                    style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }}; opacity: 0.8;"
+                    title="{{ 'Elevated Privileges Unlocked' if elevated_unlocked else 'Elevated Privileges Locked - go to Settings to unlock' }}"></i>
 
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-main);">SSH</span>
-                    <label class="switch-sm">
+                    <label class="switch-sm {{ '' if elevated_unlocked else 'disabled' }}">
                         <input type="checkbox" id="ssh-toggle-{{ host.mo_id }}" {{ 'checked' if host.ssh_enabled else ''
-                            }}
+                            }} {{ '' if elevated_unlocked else 'disabled' }}
                             onchange="toggleHostService('{{ host.vcenter_id }}', '{{ host.mo_id }}', 'TSM-SSH', this.checked)">
                         <span class="slider-sm"></span>
                     </label>
