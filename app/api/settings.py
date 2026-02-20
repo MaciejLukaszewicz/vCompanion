@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
-from app.core.session import require_auth
+from app.core.session import require_auth, is_elevated_unlocked, set_elevated_locked
 from app.core.config import settings, save_config, VCenterConfig
 import logging
 import uuid
@@ -237,8 +237,20 @@ async def get_security_settings(request: Request):
     from main import templates
     return templates.TemplateResponse("partials/settings_security.html", {
         "request": request,
-        "app_settings": settings.app_settings
+        "app_settings": settings.app_settings,
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
+
+@router.post("/security/elevated")
+async def toggle_elevated_privileges(request: Request):
+    """Toggles session-level elevated privileges."""
+    require_auth(request)
+    data = await request.json()
+    unlocked = data.get("unlocked", False)
+    set_elevated_locked(request, not unlocked)
+    
+    logger.info(f"Elevated privileges {'unlocked' if unlocked else 'locked'} for session")
+    return JSONResponse({"success": True, "unlocked": unlocked})
 
 @router.post("/security/update")
 async def update_security_settings(
@@ -254,6 +266,7 @@ async def update_security_settings(
     return templates.TemplateResponse("partials/settings_security.html", {
         "request": request,
         "app_settings": settings.app_settings,
+        "elevated_unlocked": is_elevated_unlocked(request),
         "success_msg": "Security settings updated successfully."
     })
 

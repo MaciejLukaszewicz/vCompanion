@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
-from app.core.session import require_auth
+from app.core.session import require_auth, is_elevated_unlocked
 import logging
 import csv
 import io
@@ -347,8 +347,108 @@ async def get_host_details(request: Request, vcenter_id: str, mo_id: str):
     from main import templates
     return templates.TemplateResponse("partials/inventory_host_details.html", {
         "request": request,
-        "host": host
+        "host": host,
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
+
+@router.post("/host-service")
+async def toggle_host_service(request: Request):
+    """
+    Toggles a service on an ESXi host.
+    CRITICAL: This operation requires elevated permissions (to be implemented).
+    """
+    require_auth(request)
+    try:
+        data = await request.json()
+        vc_id = data.get('vcenter_id')
+        mo_id = data.get('mo_id')
+        service = data.get('service')
+        state = data.get('state') # "start" or "stop"
+        
+        if not all([vc_id, mo_id, service, state]):
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+            
+        manager = request.app.state.vcenter_manager
+        success = manager.toggle_host_service(vc_id, mo_id, service, start=(state == "start"))
+        
+        if success:
+            return JSONResponse({"success": True})
+        else:
+            return JSONResponse({"success": False, "error": "Failed to toggle service. Check vCenter connection or host permissions."}, status_code=500)
+            
+    except Exception as e:
+        logger.error(f"Error in host-service endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+@router.post("/appliance-login")
+async def appliance_login(request: Request):
+    """Authenticates to a VCSA REST API."""
+    require_auth(request)
+    try:
+        data = await request.json()
+        vc_id = data.get('vcenter_id')
+        user = data.get('username')
+        pwd = data.get('password')
+        
+        if not all([vc_id, user, pwd]):
+            raise HTTPException(status_code=400, detail="Missing credentials")
+            
+        manager = request.app.state.vcenter_manager
+        result = manager.login_vcenter_appliance(vc_id, user, pwd)
+        
+        if result == "success":
+            return JSONResponse({"success": True})
+        
+        if result == "auth_error":
+            return JSONResponse({"success": False, "error": "Invalid credentials. Please check username and password."}, status_code=401)
+        elif result == "network_error":
+            return JSONResponse({"success": False, "error": "Communication error. Check if port 443/5480 is open to vCenter Appliance."}, status_code=503)
+        else:
+            return JSONResponse({"success": False, "error": f"Appliance login failed: {result}"}, status_code=500)
+    except Exception as e:
+        logger.error(f"Appliance login error: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+@router.get("/vcenter-ssh-status/{vc_id}")
+async def get_vcenter_ssh_status(request: Request, vc_id: str):
+    """Returns the current SSH status for a vCenter appliance."""
+    require_auth(request)
+    manager = request.app.state.vcenter_manager
+    status = manager.get_vcenter_appliance_ssh_status(vc_id)
+    
+    if status is None:
+        return JSONResponse({"success": False, "error": "No appliance session active. Please login first."}, status_code=401)
+    
+    return JSONResponse({"success": True, "enabled": status})
+
+@router.post("/vcenter-service")
+async def toggle_vcenter_service(request: Request):
+    """
+    Toggles a service on the vCenter appliance itself.
+    Privileged operation.
+    """
+    require_auth(request)
+    try:
+        data = await request.json()
+        vc_id = data.get('vcenter_id')
+        service = data.get('service') # e.g. "ssh"
+        state = data.get('state') # "start" or "stop"
+        
+        if not all([vc_id, service, state]):
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+            
+        manager = request.app.state.vcenter_manager
+        success = manager.toggle_vcenter_service(vc_id, service, start=(state == "start"))
+        
+        if success:
+            return JSONResponse({"success": True})
+        else:
+            return JSONResponse({"success": False, "error": "Operation failed. Make sure you have an active appliance session (Get Status) and correct permissions."}, status_code=500)
+            
+    except Exception as e:
+        logger.error(f"Error in vcenter-service endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
 @router.get("/snapshots")
 async def get_snapshots_partial(request: Request, today_only: bool = False):
     """Returns a global list of snapshots across all vCenters."""
@@ -562,7 +662,8 @@ async def get_vcenters_partial(request: Request):
     from main import templates
     return templates.TemplateResponse("partials/inventory_vcenters_list.html", {
         "request": request,
-        "vcenters": vcenter_statuses
+        "vcenters": vcenter_statuses,
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
 
 @router.get("/networks")

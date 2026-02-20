@@ -34,6 +34,68 @@
         <script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
     </section>
 
+    <!-- Elevated Privileges Section -->
+    <section style="padding-top: 2rem; border-top: 1px solid var(--border);">
+        <h3 style="font-size: 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="shield-check" size="18"></i> Elevated Privileges
+        </h3>
+        <p style="color: var(--text-dim); font-size: 0.875rem; margin-bottom: 1.5rem;">
+            Certain sensitive operations (like toggling SSH or management services) are locked by default to prevent
+            accidental changes.
+            Unlocking them will enable these controls across the application for the duration of this session only.
+        </p>
+
+        <div
+            style="background: rgba(var(--primary-rgb), 0.03); border: 1px solid var(--border); padding: 1.25rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div
+                    style="width: 40px; height: 40px; border-radius: 50%; background: {{ 'rgba(34, 197, 94, 0.1)' if elevated_unlocked else 'rgba(239, 68, 68, 0.1)' }}; display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}"
+                        style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }};"></i>
+                </div>
+                <div>
+                    <div style="font-weight: 600; color: var(--text-main);">Unlock elevated privileges options</div>
+                    <div style="font-size: 0.75rem; color: var(--text-dim);">
+                        Current state: <span
+                            style="font-weight: 700; color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }};">
+                            {{ 'UNLOCKED' if elevated_unlocked else 'LOCKED' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <label class="switch">
+                <input type="checkbox" id="elevated-toggle" {{ 'checked' if elevated_unlocked }}
+                    onchange="toggleElevated(this.checked)">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <script>
+            async function toggleElevated(isUnlocked) {
+                try {
+                    const r = await fetch('/api/settings/security/elevated', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ unlocked: isUnlocked })
+                    });
+                    const data = await r.json();
+                    if (data.success) {
+                        // Refresh settings content to reflect state change
+                        htmx.trigger('#settings-content-area', 'refresh-security');
+                        if (window.showNotification) {
+                            window.showNotification(`Elevated privileges ${isUnlocked ? 'unlocked' : 'locked'}.`, isUnlocked ? 'success' : 'warning');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to toggle elevated privileges:', e);
+                    document.getElementById('elevated-toggle').checked = !isUnlocked;
+                }
+            }
+        </script>
+    </section>
+
+
     <!-- Data Protection Section -->
     <section style="padding-top: 2rem; border-top: 1px solid var(--border);">
         <h3 style="font-size: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">

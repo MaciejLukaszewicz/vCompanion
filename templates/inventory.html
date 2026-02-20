@@ -483,6 +483,11 @@
         if (content.style.display === 'none') {
             content.style.display = (contentId === 'vms-content' || contentId === 'hosts-content') ? 'flex' : 'block';
             icon.style.transform = 'rotate(180deg)';
+
+            // Proactively check appliance statuses if showing vCenters
+            if (contentId === 'vcenters-content' && typeof refreshAllApplianceStatuses === 'function') {
+                refreshAllApplianceStatuses();
+            }
         } else {
             content.style.display = 'none';
             icon.style.transform = 'rotate(0deg)';

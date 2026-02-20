@@ -1,3 +1,30 @@
+<style>
+    .maintenance-row {
+        background: repeating-linear-gradient(45deg,
+                rgba(239, 68, 68, 0.1),
+                rgba(239, 68, 68, 0.1) 15px,
+                rgba(245, 158, 11, 0.1) 15px,
+                rgba(245, 158, 11, 0.1) 30px) !important;
+    }
+
+    .maintenance-row:hover {
+        background: repeating-linear-gradient(45deg,
+                rgba(239, 68, 68, 0.2),
+                rgba(239, 68, 68, 0.2) 15px,
+                rgba(245, 158, 11, 0.2) 15px,
+                rgba(245, 158, 11, 0.2) 30px) !important;
+    }
+
+    .badge-warning {
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 700;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+</style>
+
 <table class="inventory-list-table">
     <thead>
         <tr>
@@ -9,10 +36,16 @@
     <tbody>
         {% if hosts %}
         {% for host in hosts %}
-        <tr class="host-row vc-color-{{ host.vc_color_index }}"
+        <tr class="host-row vc-color-{{ host.vc_color_index }} {{ 'maintenance-row' if host.in_maintenance else '' }}"
             hx-get="/api/inventory/host-details/{{ host.vcenter_id }}/{{ host.mo_id }}" hx-target="#host-details-panel"
             hx-trigger="click">
-            <td style="font-weight: 600; color: var(--text-main);">{{ host.name }}</td>
+            <td style="font-weight: 600; color: var(--text-main);">
+                {{ host.name }}
+                {% if host.in_maintenance %}
+                <span class="badge-warning"
+                    style="font-size: 0.6rem; margin-left: 0.5rem; text-transform: uppercase;">Maintenance</span>
+                {% endif %}
+            </td>
             <td style="font-family: monospace; font-size: 0.85rem;">{{ host.ip }}</td>
             <td style="font-size: 0.75rem; color: var(--text-dim);">{{ host.vcenter_name }}</td>
         </tr>
