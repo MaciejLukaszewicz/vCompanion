@@ -19,18 +19,51 @@
                 </div>
             </td>
             <td>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <a href="https://{{ vc.fqdn or vc.host }}/ui" target="_blank" class="external-link"
-                        title="vSphere Client">
-                        {{ vc.fqdn or vc.host }}
-                        <i data-lucide="external-link" size="12"></i>
-                    </a>
-                    <span style="opacity: 0.3;">|</span>
-                    <a href="https://{{ vc.fqdn or vc.host }}:5480" target="_blank" class="external-link"
-                        title="vCenter Appliance Management Interface" style="color: var(--warning);">
-                        VAMI
-                        <i data-lucide="settings" size="12"></i>
-                    </a>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <a href="https://{{ vc.fqdn or vc.host }}/ui" target="_blank" class="external-link"
+                            title="vSphere Client">
+                            {{ vc.fqdn or vc.host }}
+                            <i data-lucide="external-link" size="12"></i>
+                        </a>
+                        <span style="opacity: 0.3;">|</span>
+                        <a href="https://{{ vc.fqdn or vc.host }}:5480" target="_blank" class="external-link"
+                            title="vCenter Appliance Management Interface" style="color: var(--warning);">
+                            VAMI
+                            <i data-lucide="settings" size="12"></i>
+                        </a>
+                    </div>
+
+                    <!-- Privileged Services Sub-card (Same as Host) -->
+                    <div
+                        style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.35rem 0.6rem; border-radius: 0.4rem; display: flex; align-items: center; gap: 0.75rem; width: fit-content;">
+                        <i data-lucide="shield-alert" size="14" style="color: var(--danger); opacity: 0.8;"
+                            title="Privileged Operation"></i>
+
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-main);">SSH</span>
+                            <label class="switch-sm" style="width: 28px; height: 16px;">
+                                <input type="checkbox" id="ssh-toggle-vc-{{ vc.id }}"
+                                    data-initial-state="{{ 'enabled' if vc.ssh_enabled == True else ('disabled' if vc.ssh_enabled == False else 'unknown') }}"
+                                    {% if vc.ssh_enabled==True %}checked{% endif %}
+                                    onchange="window.toggleVCenterService('{{ vc.id }}', this.checked, '{{ vc.name|e }}')">
+                                <span class="slider-sm" style="border-radius: 16px;"></span>
+                            </label>
+                            <span id="ssh-status-label-vc-{{ vc.id }}"
+                                style="font-size: 0.65rem; width: 55px; display: inline-block; color: {{ 'var(--success)' if vc.ssh_enabled == True else 'var(--text-dim)' }}; font-weight: 600;">
+                                {{ 'Enabled' if vc.ssh_enabled == True else ('Disabled' if vc.ssh_enabled == False else
+                                'Unknown') }}
+                            </span>
+
+                            <button onclick="window.requestApplianceLogin('{{ vc.id }}', '{{ vc.name|e }}')"
+                                class="vcenter-status-btn {{ 'has-network-error' if vc.appliance_error == 'network_error' }}"
+                                title="{{ 'Communication error - click to retry' if vc.appliance_error == 'network_error' else 'Get current SSH status from Appliance API' }}">
+                                <i data-lucide="{{ 'alert-triangle' if vc.appliance_error == 'network_error' else 'refresh-cw' }}"
+                                    size="10"></i>
+                                Get Status
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </td>
             <td style="font-size: 0.85rem; color: var(--text-dim);">
@@ -71,6 +104,26 @@
         text-decoration: underline;
     }
 
+    .vcenter-status-btn.has-network-error {
+        background: rgba(234, 179, 8, 0.15) !important;
+        border-color: rgba(234, 179, 8, 0.4) !important;
+        color: #f59e0b !important;
+    }
+
+    .vcenter-status-btn.has-network-error:hover {
+        background: rgba(234, 179, 8, 0.25) !important;
+    }
+
+    @keyframes rotate {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
     .vcenter-row td {
         vertical-align: middle;
     }
@@ -87,8 +140,277 @@
         box-shadow: 0 0 6px var(--success);
     }
 
-    .status-error {
-        background: var(--danger);
-        box-shadow: 0 0 6px var(--danger);
+    .vcenter-status-btn {
+        padding: 4px 10px;
+        font-size: 0.7rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text-dim);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+        font-weight: 500;
+        margin-left: 0.5rem;
+    }
+
+    .vcenter-status-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-main);
+        border-color: var(--text-dim);
+    }
+
+    /* Small toggle switch */
+    .switch-sm {
+        position: relative;
+        display: inline-block;
+        width: 32px;
+        height: 18px;
+    }
+
+    .switch-sm input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider-sm {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--border);
+        transition: .3s;
+        border-radius: 18px;
+    }
+
+    .slider-sm:before {
+        position: absolute;
+        content: "";
+        height: 12px;
+        width: 12px;
+        left: 2px;
+        bottom: 2px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+    }
+
+    .switch-sm input:checked+.slider-sm {
+        background-color: var(--success);
+    }
+
+    .switch-sm input:checked+.slider-sm:before {
+        transform: translateX(14px);
+    }
+
+    /* Indeterminate state */
+    .switch-sm input:indeterminate+.slider-sm {
+        background-color: var(--text-dim);
+        opacity: 0.5;
+    }
+
+    .switch-sm input:indeterminate+.slider-sm:before {
+        transform: translateX(7px);
     }
 </style>
+
+<!-- Appliance Login Modal -->
+<div id="applianceLoginModal" class="modal-overlay"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div class="login-card"
+        style="max-width: 400px; width: 90%; background: #1a1a1a; padding: 2.5rem; border-radius: 1.25rem; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);">
+        <h3 style="margin-top: 0; color: #fff; display: flex; align-items: center; gap: 0.75rem;"><i
+                data-lucide="shield-check" style="color: var(--warning);"></i> Appliance Access</h3>
+        <p style="font-size: 0.875rem; color: rgba(255,255,255,0.5); margin-bottom: 2rem;">Enter management credentials
+            for <strong id="modal-vc-name" style="color: #fff;"></strong> to verify SSH status.</p>
+
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div>
+                <label
+                    style="display: block; font-size: 0.7rem; color: rgba(255,255,255,0.4); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em;">Username</label>
+                <input type="text" id="appliance-user" placeholder="e.g. root"
+                    onkeydown="if(event.key==='Enter') submitApplianceLogin()"
+                    style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.8rem; border-radius: 0.6rem; outline: none;">
+            </div>
+            <div>
+                <label
+                    style="display: block; font-size: 0.7rem; color: rgba(255,255,255,0.4); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em;">Password</label>
+                <input type="password" id="appliance-pass" placeholder="••••••••"
+                    onkeydown="if(event.key==='Enter') submitApplianceLogin()"
+                    style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.8rem; border-radius: 0.6rem; outline: none;">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 1.25rem; justify-content: flex-end; margin-top: 2.5rem;">
+            <button onclick="closeApplianceModal()"
+                style="background: transparent; border: none; color: rgba(255,255,255,0.4); cursor: pointer; font-size: 0.875rem; font-weight: 500;">Cancel</button>
+            <button id="modal-submit-btn" onclick="submitApplianceLogin()" class="btn-primary"
+                style="width: auto; padding: 0.75rem 1.75rem; border-radius: 0.75rem; font-weight: 600;">
+                Connect
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Init indeterminate state
+    document.querySelectorAll('input[id^="ssh-toggle-vc-"]').forEach(cb => {
+        if (cb.dataset.initialState === 'unknown') cb.indeterminate = true;
+    });
+
+    let activeVcId = null;
+
+    window.requestApplianceLogin = function (vcId, vcName) {
+        try {
+            activeVcId = vcId;
+            const modal = document.getElementById('applianceLoginModal');
+            if (!modal) {
+                console.error('Modal applianceLoginModal not found');
+                return;
+            }
+            document.getElementById('modal-vc-name').textContent = vcName || 'vCenter';
+            modal.style.display = 'flex';
+            document.getElementById('appliance-user').value = '';
+            document.getElementById('appliance-pass').value = '';
+            setTimeout(() => document.getElementById('appliance-user').focus(), 100);
+        } catch (e) {
+            console.error('Error opening login modal:', e);
+        }
+    }
+
+    window.closeApplianceModal = function () {
+        document.getElementById('applianceLoginModal').style.display = 'none';
+        activeVcId = null;
+    }
+
+    async function submitApplianceLogin() {
+        if (!activeVcId) return;
+        const user = document.getElementById('appliance-user').value;
+        const pass = document.getElementById('appliance-pass').value;
+        const btn = document.getElementById('modal-submit-btn');
+        const originalText = btn.textContent;
+
+        btn.disabled = true;
+        btn.textContent = 'Authenticating...';
+
+        try {
+            const r = await fetch('/api/inventory/appliance-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vcenter_id: activeVcId, username: user, password: pass })
+            });
+            const data = await r.json();
+            if (data.success) {
+                if (window.showNotification) window.showNotification('REST API Connection established.', 'success');
+                const vcIdToUpdate = activeVcId;
+                closeApplianceModal();
+                updateSSHStatus(vcIdToUpdate);
+            } else throw new Error(data.error || 'Login failed');
+        } catch (e) {
+            if (window.showNotification) window.showNotification(e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    }
+
+    async function updateSSHStatus(vcId, silent = false) {
+        const label = document.getElementById(`ssh-status-label-vc-${vcId}`);
+        const cb = document.getElementById(`ssh-toggle-vc-${vcId}`);
+        label.textContent = 'Updating...';
+        label.style.color = 'var(--text-dim)';
+
+        try {
+            const r = await fetch(`/api/inventory/vcenter-ssh-status/${vcId}`);
+            const data = await r.json();
+            if (data.success) {
+                cb.indeterminate = false;
+                cb.checked = data.enabled;
+                label.textContent = data.enabled ? 'Enabled' : 'Disabled';
+                label.style.color = data.enabled ? 'var(--success)' : 'var(--text-dim)';
+            } else throw new Error(data.error);
+        } catch (e) {
+            label.textContent = 'Unknown';
+            cb.indeterminate = true;
+            const msg = e.message.toLowerCase();
+            if (!silent && (msg.includes('login') || msg.includes('session'))) {
+                const row = cb.closest('tr');
+                const vcName = row ? row.querySelector('td').textContent.trim() : 'vCenter';
+                window.requestApplianceLogin(vcId, vcName);
+            } else if (!silent && window.showNotification) {
+                window.showNotification(e.message, 'warning');
+            }
+        }
+    }
+
+    window.toggleVCenterService = async function (vcId, isEnabled, vcName) {
+        const label = document.getElementById(`ssh-status-label-vc-${vcId}`);
+        const cb = document.getElementById(`ssh-toggle-vc-${vcId}`);
+
+        if (cb.indeterminate) {
+            cb.checked = !isEnabled;
+            window.requestApplianceLogin(vcId, vcName);
+            return;
+        }
+
+        const state = isEnabled ? 'start' : 'stop';
+        label.textContent = isEnabled ? 'Enabling...' : 'Disabling...';
+        label.style.color = 'var(--text-dim)';
+
+        try {
+            const r = await fetch('/api/inventory/vcenter-service', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vcenter_id: vcId, service: 'ssh', state: state })
+            });
+            const data = await r.json();
+            if (data.success) {
+                label.textContent = isEnabled ? 'Enabled' : 'Disabled';
+                label.style.color = isEnabled ? 'var(--success)' : 'var(--text-dim)';
+                if (window.showNotification) window.showNotification(`vCenter SSH ${state}ed.`, 'success');
+            } else throw new Error(data.error);
+        } catch (e) {
+            cb.checked = !isEnabled;
+            label.textContent = !isEnabled ? 'Enabled' : 'Disabled';
+            label.style.color = !isEnabled ? 'var(--success)' : 'var(--text-dim)';
+
+            const msg = e.message.toLowerCase();
+            if (msg.includes('login') || msg.includes('session')) {
+                cb.indeterminate = true;
+                label.textContent = 'Unknown';
+                window.requestApplianceLogin(vcId, vcName);
+            } else if (window.showNotification) {
+                window.showNotification(e.message, 'error');
+            }
+        }
+    }
+
+    window.refreshAllApplianceStatuses = function () {
+        document.querySelectorAll('input[id^="ssh-toggle-vc-"]').forEach(cb => {
+            // Only refresh if not already unknown, to verify token validity
+            if (!cb.indeterminate) {
+                const vcId = cb.id.replace('ssh-toggle-vc-', '');
+                updateSSHStatus(vcId, true); // Silent refresh
+            }
+        });
+    };
+
+    // Run on HTMX swap to handle first load or refresh
+    document.body.addEventListener('htmx:afterSwap', (e) => {
+        if (e.detail.target.id === 'vcenters-list-target') {
+            // Re-init icons and indeterminate states
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            document.querySelectorAll('input[id^="ssh-toggle-vc-"]').forEach(cb => {
+                if (cb.dataset.initialState === 'unknown') cb.indeterminate = true;
+            });
+            // Don't auto-refresh here to avoid spamming as toggleInventorySection handles it
+        }
+    });
+</script>

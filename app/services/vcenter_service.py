@@ -101,12 +101,14 @@ class VCenterManager:
 
             # 7. Fetch About info (version, build, etc.)
             about = conn.content.about
+            
             metadata = {
                 "version": about.version,
                 "build": about.build,
                 "full_name": about.fullName,
                 "api_type": about.apiType,
-                "fqdn": conn.config.host
+                "fqdn": conn.config.host,
+                "ssh_enabled": None
             }
             
             self.cache.update_vcenter_status(vc_id, conn.config.name, 'READY', metadata=metadata)
@@ -215,11 +217,49 @@ class VCenterManager:
             self.trigger_refresh(vc_id)
         return success
 
+    def toggle_vcenter_service(self, vc_id, service_key, start=True):
+        """Delegates vCenter appliance service toggle and triggers refresh."""
+        if vc_id not in self.connections: return False
+        conn = self.connections[vc_id]
+        
+        success = conn.toggle_vcenter_service(service_key, start)
+        if success:
+            if service_key == 'ssh':
+                self.cache.update_vcenter_metadata(vc_id, {"ssh_enabled": start})
+            # Trigger background refresh
+            self.trigger_refresh(vc_id)
+        return success
+
+    def login_vcenter_appliance(self, vc_id, user, password):
+        """Authenticates with the VCSA REST API for a specific vCenter."""
+        if vc_id not in self.connections: return "vc_not_found"
+        result = self.connections[vc_id].login_appliance(user, password)
+        # Sync error state to cache for UI indicators
+        self.cache.update_vcenter_metadata(vc_id, {"appliance_error": None if result == "success" else result})
+        return result
+
+    def get_vcenter_appliance_ssh_status(self, vc_id):
+        """Gets SSH status from VCSA REST API and updates cache."""
+        if vc_id not in self.connections: return None
+        status = self.connections[vc_id].get_appliance_ssh_status()
+        
+        # get_appliance_ssh_status returns None if error, but we should know why.
+        # Connection carries last_appliance_error
+        conn = self.connections[vc_id]
+        if status is not None:
+             self.cache.update_vcenter_metadata(vc_id, {"ssh_enabled": status, "appliance_error": None})
+        else:
+             self.cache.update_vcenter_metadata(vc_id, {"appliance_error": getattr(conn, 'last_appliance_error', 'unknown')})
+             
+        return status
+
 class VCenterConnection:
     def __init__(self, config: VCenterConfig):
         self.config = config
         self.si = None
         self.content = None
+        self.appliance_token = None
+        self.last_appliance_error = None
 
     def is_alive(self):
         if not self.si: return False
@@ -227,6 +267,168 @@ class VCenterConnection:
             self.si.CurrentTime()
             return True
         except: return False
+
+    def _appliance_rest_call(self, method, endpoint, data=None):
+        """Helper for VCSA REST API calls (Appliance API)"""
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        port = getattr(self, 'appliance_port', 443)
+        # We try the sticky prefix first, but legacy/modern can be mixed for services vs session
+        prefix_primary = getattr(self, 'appliance_prefix', '/api')
+        prefix_secondary = '/rest' if prefix_primary == '/api' else '/api'
+        
+        verify = self.config.verify_ssl
+        headers = {
+            "vmware-api-session-id": self.appliance_token,
+            "Content-Type": "application/json"
+        }
+
+        for prefix in [prefix_primary, prefix_secondary]:
+            url = f"https://{self.config.host}:{port}{prefix}{endpoint}"
+            try:
+                if method.lower() == 'get':
+                    response = requests.get(url, headers=headers, verify=verify, timeout=5)
+                elif method.lower() == 'put':
+                    response = requests.put(url, headers=headers, json=data, verify=verify, timeout=5)
+                elif method.lower() == 'post':
+                    response = requests.post(url, headers=headers, json=data, verify=verify, timeout=5)
+                
+                # Success codes often differ (200, 201, 204)
+                if response.status_code in [200, 201, 204]:
+                    self.last_appliance_error = None
+                    return response
+                
+                # If error, log it for debugging
+                logger.debug(f"[{self.config.name}] VCSA REST {method} on {url} returned {response.status_code}: {response.text}")
+
+                # Retry on 404 (wrong path), 500/405 (wrong payload/path combo for this prefix)
+                if response.status_code in [404, 405, 500]:
+                    continue
+                
+                # If 401, token might be truly dead or prefix mismatch
+                if response.status_code == 401:
+                    self.last_appliance_error = "auth_error"
+                    if prefix == prefix_secondary: # Both failed
+                        logger.warning(f"[{self.config.name}] VCSA REST 401 on both paths. Session expired.")
+                        self.appliance_token = None
+                    continue
+                
+                self.last_appliance_error = f"http_{response.status_code}"
+                return response # Return other errors (e.g. 400, 403)
+            except Exception as e:
+                logger.debug(f"[{self.config.name}] VCSA REST {method} fail on {url}: {e}")
+                self.last_appliance_error = "network_error"
+                continue
+                
+        return None
+
+    def login_appliance(self, user, password):
+        """Authenticates to the VCSA REST API. Tries multiple ports and endpoints."""
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        logger.info(f"[{self.config.name}] Initiating VCSA appliance login for user: {user}")
+        
+        verify = self.config.verify_ssl
+        ports = [443, 5480]
+        endpoints = ["/api/session", "/rest/com/vmware/cis/session"]
+        
+        any_401 = False
+        any_network_error = False
+        
+        for port in ports:
+            for endpoint in endpoints:
+                url = f"https://{self.config.host}:{port}{endpoint}"
+                try:
+                    logger.debug(f"[{self.config.name}] Trying appliance login at {url}")
+                    response = requests.post(url, auth=(user, password), verify=verify, timeout=5)
+                    
+                    if response.status_code in [200, 201]:
+                        # Success!
+                        content_type = response.headers.get('Content-Type', '')
+                        if 'application/json' in content_type:
+                            data = response.json()
+                            token = data['value'] if isinstance(data, dict) and 'value' in data else data
+                        else:
+                            token = response.text.strip('"')
+                        
+                        self.appliance_token = token
+                        self.appliance_port = port
+                        self.appliance_prefix = "/api" if endpoint.startswith("/api") else "/rest"
+                        self.last_appliance_error = None
+                        logger.info(f"[{self.config.name}] VCSA appliance login successful for user: {user} (via port {port}, {endpoint})")
+                        return "success"
+                    
+                    if response.status_code == 401:
+                        any_401 = True
+                        logger.debug(f"[{self.config.name}] 401 Unauthorized at {url}")
+                    else:
+                        logger.debug(f"[{self.config.name}] Status {response.status_code} at {url}")
+
+                except Exception as e:
+                    any_network_error = True
+                    logger.debug(f"[{self.config.name}] Connection failed to {url}: {e}")
+
+        # If we reached here, determine the best error type to report
+        if any_401:
+            self.last_appliance_error = "auth_error"
+            logger.error(f"[{self.config.name}] VCSA appliance login failed: Invalid credentials for user {user}")
+            return "auth_error"
+        
+        if any_network_error:
+            self.last_appliance_error = "network_error"
+            logger.error(f"[{self.config.name}] VCSA appliance login failed: Network/Communication error to ports [443, 5480]")
+            return "network_error"
+
+        self.last_appliance_error = "unknown_error"
+        return "unknown_error"
+
+    def get_appliance_ssh_status(self):
+        """Returns True if SSH is enabled, False if disabled, None if error."""
+        if not self.appliance_token: return None
+        resp = self._appliance_rest_call('get', '/appliance/access/ssh')
+        if resp and resp.status_code == 200:
+            try:
+                data = resp.json()
+                # Handle potential {"value": boolean} wrapper
+                if isinstance(data, dict) and 'value' in data:
+                    return data['value']
+                return data
+            except Exception as e:
+                logger.error(f"Failed to parse SSH status response: {e}")
+                return None
+        return None
+
+    def toggle_appliance_ssh(self, start=True):
+        """Enable or disable SSH on VCSA."""
+        if not self.appliance_token: return False
+        
+        # Most VCSA versions (especially 7/8) expect a JSON object for SSH toggle
+        payload = {"enabled": start}
+        resp = self._appliance_rest_call('put', '/appliance/access/ssh', data=payload)
+        
+        # PUT returns 204 No Content on success in modern API, or 200 in legacy
+        success = resp is not None and (resp.status_code in [200, 204])
+        if success:
+            logger.info(f"[{self.config.name}] VCSA SSH service {'enabled' if start else 'disabled'} successfully.")
+        else:
+            err_msg = resp.text if resp else "No response"
+            logger.error(f"[{self.config.name}] Failed to toggle VCSA SSH: {err_msg}")
+            
+        return success
+
+    def toggle_vcenter_service(self, service_key, start=True):
+        """
+        Attempts to toggle a service on the VCSA.
+        """
+        if service_key == 'ssh':
+            return self.toggle_appliance_ssh(start)
+        
+        logger.warning(f"Toggle vCenter service {service_key} requested - not implemented for non-ssh via REST yet.")
+        return False
 
     def connect(self, user, password):
         """

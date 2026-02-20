@@ -110,6 +110,13 @@ class CacheService:
         self._data["vcenters"][vc_id] = data
         self._save_to_disk()
 
+    def update_vcenter_metadata(self, vc_id: str, metadata: dict):
+        """Surgically update metadata fields for a vCenter in the cache."""
+        if not self._is_unlocked: return
+        if vc_id in self._data["vcenters"]:
+            self._data["vcenters"][vc_id].update(metadata)
+            self._save_to_disk()
+
     def get_vcenter_status(self, vc_id: str = None):
         if vc_id: return self._data["vcenters"].get(vc_id)
         enabled_ids = self.enabled_vc_ids
