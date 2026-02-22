@@ -903,7 +903,8 @@ class VCenterConnection:
                     "user": t.reason.userName if hasattr(t.reason, 'userName') else "System",
                     "start_time": t.startTime.isoformat() if t.startTime else None,
                     "completion_time": t.completeTime.isoformat() if t.completeTime else None,
-                    "status": status, "progress": progress, "error": t.error.localizedMessage if t.error else None
+                    "status": status, "progress": progress, 
+                    "error": getattr(t.error, 'localizedMessage', getattr(t.error, 'msg', str(t.error))) if t.error else None
                 })
             logger.info(f"[{self.config.name}] Fetched {len(result)} tasks in {time.time()-start_t:.2f}s")
             return result
