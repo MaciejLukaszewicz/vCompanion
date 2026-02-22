@@ -37,7 +37,7 @@
                 </button>
             </div>
         </div>
-        <nav>
+        <nav hx-boost="true" hx-target="#page-content" hx-select="#page-content" hx-swap="outerHTML" hx-push-url="true">
             <ul>
                 <li><a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}" title="Dashboard">
                         <i data-lucide="layout-dashboard"></i>
@@ -100,7 +100,9 @@
         </div>
         {% endif %}
 
-        {% block content %}{% endblock %}
+        <div id="page-content">
+            {% block content %}{% endblock %}
+        </div>
     </main>
 
     <!-- Toast Notifications -->
@@ -368,6 +370,17 @@
         document.body.addEventListener('htmx:afterOnLoad', (evt) => {
             if (evt.detail.target) {
                 refreshIcons(evt.detail.target);
+            }
+            // Update active state in sidebar seamlessly
+            if (evt.detail.target && evt.detail.target.id === 'page-content') {
+                const url = new URL(evt.detail.xhr.responseURL).pathname;
+                document.querySelectorAll('nav a').forEach(a => {
+                    if (a.getAttribute('href') === url) {
+                        a.classList.add('active');
+                    } else {
+                        a.classList.remove('active');
+                    }
+                });
             }
         });
 
