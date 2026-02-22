@@ -55,7 +55,16 @@
             <div
                 style="background: rgba(var(--primary-rgb), 0.03); border: 1px solid var(--border); padding: 1rem; border-radius: 0.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <span style="font-weight: 600; color: var(--text-main);">{{ snap.name }}</span>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button type="button" class="btn-icon"
+                            title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete snapshot{% endif %}"
+                            style="color: var(--danger); padding: 0; {% if not elevated_unlocked %}opacity: 0.3; cursor: not-allowed;{% endif %}"
+                            {% if not elevated_unlocked %}disabled{% endif %}
+                            onclick="deleteSnapshot('{{ vm.vcenter_id }}', '{{ vm.id }}', '{{ snap.name }}', this)">
+                            <i data-lucide="trash-2" size="16"></i>
+                        </button>
+                        <span style="font-weight: 600; color: var(--text-main);">{{ snap.name }}</span>
+                    </div>
                     <span style="font-size: 0.75rem; color: var(--text-dim);">{{ snap.created.split('T')[0] }} {{
                         snap.created.split('T')[1].split('.')[0] }}</span>
                 </div>

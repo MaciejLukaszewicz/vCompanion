@@ -267,7 +267,8 @@ async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
         "request": request,
         "vm": vm,
         "network_tree": network_tree,
-        "storage_tree": storage_tree
+        "storage_tree": storage_tree,
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
 
 @router.get("/hosts")
@@ -509,8 +510,64 @@ async def get_snapshots_partial(request: Request, today_only: bool = False):
     return templates.TemplateResponse("partials/snapshots_table.html", {
         "request": request,
         "global_snapshots": global_snapshots,
-        "snap_count": len(global_snapshots)
+        "snap_count": len(global_snapshots),
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
+
+@router.post("/snapshots/delete")
+async def delete_snapshot_endpoint(request: Request):
+    """Deletes a specific snapshot. Requires elevated privileges."""
+    require_auth(request)
+    if not is_elevated_unlocked(request):
+        return JSONResponse({"success": False, "error": "Elevated privileges required"}, status_code=403)
+        
+    try:
+        data = await request.json()
+        vc_id = data.get('vcenter_id')
+        vm_id = data.get('vm_id')
+        snap_name = data.get('snapshot_name')
+        
+        if not all([vc_id, vm_id, snap_name]):
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+            
+        manager = request.app.state.vcenter_manager
+        success = manager.remove_snapshot(vc_id, vm_id, snap_name)
+        
+        if success:
+            return JSONResponse({"success": True})
+        else:
+            return JSONResponse({"success": False, "error": "Failed to delete snapshot. Check logs."}, status_code=500)
+    except Exception as e:
+        logger.error(f"Error in delete_snapshot_endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+@router.post("/snapshots/delete-bulk")
+async def delete_snapshots_bulk_endpoint(request: Request):
+    """Deletes multiple snapshots. Requires elevated privileges."""
+    require_auth(request)
+    if not is_elevated_unlocked(request):
+        return JSONResponse({"success": False, "error": "Elevated privileges required"}, status_code=403)
+        
+    try:
+        data = await request.json()
+        snapshots = data.get('snapshots', [])
+        
+        if not snapshots:
+            raise HTTPException(status_code=400, detail="No snapshots provided")
+            
+        manager = request.app.state.vcenter_manager
+        results = []
+        for snap in snapshots:
+            vc_id = snap.get('vcenter_id')
+            vm_id = snap.get('vm_id')
+            snap_name = snap.get('snapshot_name')
+            success = manager.remove_snapshot(vc_id, vm_id, snap_name)
+            results.append({"snapshot_name": snap_name, "success": success})
+            
+        return JSONResponse({"success": True, "results": results})
+    except Exception as e:
+        logger.error(f"Error in delete_snapshots_bulk_endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 @router.get("/export/vms")
 async def export_vms_csv(request: Request, q: str = "", snaps_only: bool = False):

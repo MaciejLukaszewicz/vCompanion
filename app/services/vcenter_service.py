@@ -230,6 +230,16 @@ class VCenterManager:
             self.trigger_refresh(vc_id)
         return success
 
+    def remove_snapshot(self, vc_id: str, vm_mo_id: str, snapshot_name: str) -> bool:
+        """Proxies snapshot removal to specific vCenter and triggers a refresh."""
+        if vc_id not in self.connections: return False
+        conn = self.connections[vc_id]
+        if not conn.is_alive(): return False
+        success = conn.remove_snapshot(vm_mo_id, snapshot_name)
+        if success:
+            self.trigger_refresh(vc_id)
+        return success
+
     def login_vcenter_appliance(self, vc_id, user, password):
         """Authenticates with the VCSA REST API for a specific vCenter."""
         if vc_id not in self.connections: return "vc_not_found"
@@ -1306,3 +1316,36 @@ class VCenterConnection:
         except Exception as e:
             logger.error(f"[{self.config.name}] Error fetching storage: {e}")
             return {}
+
+    def remove_snapshot(self, vm_mo_id: str, snapshot_name: str) -> bool:
+        """Removes a snapshot by its name from a given VM."""
+        if not self.content: return False
+        try:
+            # Locate the VM
+            vm = vim.VirtualMachine(vm_mo_id, stub=self.content.sessionManager._stub)
+            if not vm or not vm.snapshot or not vm.snapshot.rootSnapshotList:
+                logger.error(f"[{self.config.name}] Target VM {vm_mo_id} lacking snapshots.")
+                return False
+                
+            # Recursive search for the snapshot object
+            def find_snap(snap_list, name):
+                for s in snap_list:
+                    if s.name == name:
+                        return s.snapshot
+                    if s.childSnapshotList:
+                        child_res = find_snap(s.childSnapshotList, name)
+                        if child_res: return child_res
+                return None
+                
+            snap_obj = find_snap(vm.snapshot.rootSnapshotList, snapshot_name)
+            if not snap_obj:
+                logger.error(f"[{self.config.name}] Snapshot '{snapshot_name}' not found on VM {vm_mo_id}.")
+                return False
+                
+            # Request deletion (removeChildren=False to only remove THIS snapshot)
+            task = snap_obj.RemoveSnapshot_Task(removeChildren=False)
+            logger.info(f"[{self.config.name}] Dispatched RemoveSnapshot_Task for VM {vm_mo_id}, Snapshot: {snapshot_name}")
+            return True
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Failed to remove snapshot: {e}")
+            return False

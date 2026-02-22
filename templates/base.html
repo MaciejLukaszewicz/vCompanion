@@ -102,6 +102,7 @@
 
         <div id="page-content">
             {% block content %}{% endblock %}
+            {% block extra_scripts %}{% endblock %}
         </div>
     </main>
 
@@ -577,7 +578,6 @@
         })();
         {% endif %}
     </script>
-    {% block extra_scripts %} {% endblock %}
 </body>
 
 </html>

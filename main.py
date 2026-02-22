@@ -80,7 +80,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import auth, dashboard, vcenters, inventory, settings as settings_api
-from app.core.session import is_authenticated
+from app.core.session import is_authenticated, is_elevated_unlocked
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -195,7 +195,8 @@ async def inventory(request: Request):
         "request": request,
         "username": request.session.get("username"),
         "active_page": "inventory",
-        "vcenter_status": get_vcenter_status(request)
+        "vcenter_status": get_vcenter_status(request),
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
 
 @app.get("/reports")

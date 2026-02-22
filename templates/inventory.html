@@ -128,6 +128,15 @@
                         </div>
                         <span style="font-size: 0.85rem; color: var(--text-dim);">Taken today</span>
                     </label>
+
+                    <div style="width: 1px; height: 24px; background: var(--border); margin: 0 0.5rem;"></div>
+
+                    <button type="button" class="btn-primary" id="btn-delete-selected-snaps"
+                        title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete selected snapshots{% endif %}"
+                        style="{% if not elevated_unlocked %}opacity: 0.5; cursor: not-allowed;{% endif %} display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: var(--danger); border: none; color: white; border-radius: 4px; font-size: 0.85rem;"
+                        {% if not elevated_unlocked %}disabled{% endif %} onclick="deleteSelectedGlobalSnapshots()">
+                        <i data-lucide=" trash-2" size="14"></i> Delete Selected
+                    </button>
                 </form>
             </div>
 
@@ -642,6 +651,118 @@
 
             // Save preferred height
             localStorage.setItem('vms-panel-height', parseInt(content.style.height));
+        }
+    }
+
+    // Snapshot Deletion Logic
+    function toggleAllSnapshots(source) {
+        const checkboxes = document.querySelectorAll('.snapshot-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = source.checked;
+        });
+        updateSnapshotDeleteState();
+    }
+
+    function updateSnapshotDeleteState() {
+        const checkboxes = document.querySelectorAll('.snapshot-checkbox:checked');
+        const count = checkboxes.length;
+        const btnTitle = document.getElementById('btn-delete-selected-snaps');
+        if (btnTitle) {
+            btnTitle.innerHTML = `<i data-lucide="trash-2" size="14"></i> Delete Selected (${count})`;
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+    }
+
+    async function deleteSnapshot(vcenterId, vmId, snapshotName, btnElem) {
+        if (!confirm(`Are you sure you want to delete snapshot '${snapshotName}'?`)) return;
+
+        // Visual feedback
+        const originalIcon = btnElem.innerHTML;
+        btnElem.innerHTML = '<div class="spinner-small" style="width: 14px; height: 14px; border-width: 1px;"></div>';
+        btnElem.disabled = true;
+
+        try {
+            const res = await fetch('/api/inventory/snapshots/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    vcenter_id: vcenterId,
+                    vm_id: vmId,
+                    snapshot_name: snapshotName
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                showToast(`Snapshot '${snapshotName}' deletion initiated.`, 'success');
+                // Trigger reload
+                htmx.trigger('#snap-filters', 'change');
+                if (document.getElementById('vm-details-panel')) {
+                    // Update VM details if showing
+                    htmx.trigger(`#vm-details-panel [hx-get]`, 'click');
+                }
+            } else {
+                showToast(data.error || 'Failed to delete snapshot', 'error');
+                btnElem.innerHTML = originalIcon;
+                btnElem.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error deleting snapshot:', error);
+            showToast('Network error while deleting snapshot.', 'error');
+            btnElem.innerHTML = originalIcon;
+            btnElem.disabled = false;
+        }
+    }
+
+    async function deleteSelectedGlobalSnapshots() {
+        const checkboxes = document.querySelectorAll('.snapshot-checkbox:checked');
+        const count = checkboxes.length;
+        if (count === 0) {
+            showToast('No snapshots selected.', 'warning');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete ${count} selected snapshot(s)?`)) return;
+
+        const btnTitle = document.getElementById('btn-delete-selected-snaps');
+        const originalText = btnTitle.innerHTML;
+        btnTitle.innerHTML = '<div class="spinner-small" style="width: 14px; height: 14px; border-width: 1px;"></div> Deleting...';
+        btnTitle.disabled = true;
+
+        const snapshots = [];
+        checkboxes.forEach(cb => {
+            snapshots.push({
+                vcenter_id: cb.getAttribute('data-vcenter-id'),
+                vm_id: cb.getAttribute('data-vm-id'),
+                snapshot_name: cb.value
+            });
+        });
+
+        try {
+            const res = await fetch('/api/inventory/snapshots/delete-bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ snapshots: snapshots })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                showToast(`Successfully initiated deletion of ${count} snapshots.`, 'success');
+                htmx.trigger('#snap-filters', 'change');
+            } else {
+                showToast(data.error || 'Failed to delete selected snapshots', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting snapshots in bulk:', error);
+            showToast('Network error while deleting snapshots.', 'error');
+        } finally {
+            btnTitle.innerHTML = originalText;
+            btnTitle.disabled = false;
+            if (window.lucide) {
+                lucide.createIcons();
+            }
         }
     }
 
