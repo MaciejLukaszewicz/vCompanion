@@ -108,46 +108,64 @@
     <!-- Global Snapshots Section -->
     <section class="table-container" id="snapshots-section" style="margin-bottom: 1rem;">
         <div
-            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
-            <div style="display: flex; align-items: center; gap: 1.5rem;">
-                <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;"
+            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); flex-wrap: wrap; gap: 0.75rem;">
+
+            <!-- LEFT: title + today filter (inside HTMX form) -->
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none; margin: 0;"
                     onclick="toggleInventorySection('snapshots-content', 'snapshots-toggle-icon')">
                     <i data-lucide="camera" size="18" style="color: var(--accent);"></i> Global Snapshots
                     <span id="snap-count-badge" class="badge-accent" style="margin-left: 0.5rem;">{{ snap_count or 0
                         }}</span>
                 </h2>
 
-                <!-- Snapshot Filters -->
-                <form id="snap-filters" style="display: flex; align-items: center; gap: 1rem;"
+                <form id="snap-filters" style="display: flex; align-items: center; gap: 0.75rem;"
                     hx-get="/api/inventory/snapshots" hx-target="#snapshots-list-target" hx-trigger="change">
-                    <label
-                        style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;">
+                    <div style="width: 1px; height: 24px; background: var(--border);"></div>
+                    <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; user-select: none;">
                         <div class="switch">
-                            <input type="checkbox" name="today_only" value="true" hx-trigger="change">
+                            <input type="checkbox" name="today_only" value="true">
                             <span class="slider"></span>
                         </div>
                         <span style="font-size: 0.85rem; color: var(--text-dim);">Taken today</span>
                     </label>
-
-                    <div style="width: 1px; height: 24px; background: var(--border); margin: 0 0.5rem;"></div>
-
-                    <!-- Privileged Delete Action -->
-                    <div
-                        style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.15); padding: 0.3rem 0.6rem; border-radius: 6px; display: flex; align-items: center; gap: 0.75rem; width: fit-content;">
-                        <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}" size="14"
-                            style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }}; opacity: 0.8;"
-                            title="{{ 'Elevated Privileges Unlocked' if elevated_unlocked else 'Elevated Privileges Locked - go to Settings to unlock' }}"></i>
-
-                        <button type="button" class="btn-primary" id="btn-delete-selected-snaps"
-                            title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete selected snapshots{% endif %}"
-                            style="{% if not elevated_unlocked %}opacity: 0.5; cursor: not-allowed;{% endif %} display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: var(--danger); border: none; color: white; border-radius: 4px; font-size: 0.85rem;"
-                            {% if not elevated_unlocked %}disabled{% endif %} onclick="deleteSelectedGlobalSnapshots()">
-                            <i data-lucide="trash-2" size="14"></i> Delete Selected
-                        </button>
-                    </div>
                 </form>
             </div>
 
+            <!-- CENTER: search + delete (OUTSIDE the HTMX form to avoid triggering reload on change) -->
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <!-- Search/Filter -->
+                <div style="position: relative; display: flex; align-items: center;">
+                    <i data-lucide="search" size="14"
+                        style="position: absolute; left: 0.5rem; color: var(--text-dim); pointer-events: none; z-index: 1;"></i>
+                    <input type="text" id="snap-search-input" oninput="filterSnapshots(this.value)"
+                        placeholder="Filter by VM, name, description…"
+                        style="padding: 0.35rem 2rem 0.35rem 1.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 4px; color: var(--text-main); font-size: 0.8rem; width: 280px; outline: none;">
+                    <button type="button" id="snap-search-clear" onclick="clearSnapSearch()"
+                        style="position: absolute; right: 0.4rem; background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0; display: none; align-items: center; justify-content: center;"
+                        title="Clear search">
+                        <i data-lucide="x" size="14"></i>
+                    </button>
+                </div>
+
+                <div style="width: 1px; height: 24px; background: var(--border);"></div>
+
+                <!-- Privileged Delete Action -->
+                <div
+                    style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.15); padding: 0.3rem 0.6rem; border-radius: 6px; display: flex; align-items: center; gap: 0.75rem;">
+                    <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}" size="14"
+                        style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }}; opacity: 0.8;"
+                        title="{{ 'Elevated Privileges Unlocked' if elevated_unlocked else 'Elevated Privileges Locked - go to Settings to unlock' }}"></i>
+                    <button type="button" class="btn-primary" id="btn-delete-selected-snaps"
+                        title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete selected snapshots{% endif %}"
+                        style="{% if not elevated_unlocked %}opacity: 0.5; cursor: not-allowed;{% endif %} display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: var(--danger); border: none; color: white; border-radius: 4px; font-size: 0.85rem;"
+                        {% if not elevated_unlocked %}disabled{% endif %} onclick="deleteSelectedGlobalSnapshots()">
+                        <i data-lucide="trash-2" size="14"></i> Delete Selected
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT: action icons -->
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <div class="header-action-icon" id="btn-refresh-snapshots" onclick="refreshSnapshots()"
                     title="Refresh snapshots list">
@@ -163,6 +181,7 @@
                 </div>
             </div>
         </div>
+
         <div id="snapshots-content" style="display: none; height: 400px; overflow-y: auto;"
             hx-get="/api/inventory/snapshots" hx-trigger="load" hx-target="#snapshots-list-target">
             <div id="snapshots-list-target">
@@ -673,6 +692,37 @@
     // Snapshot Deletion Logic
     let activeTaskCount = 0;
 
+    function filterSnapshots(query) {
+        const q = query.trim().toLowerCase();
+        const rows = document.querySelectorAll('#snapshots-list-target .inventory-list-table tbody tr');
+        rows.forEach(row => {
+            const searchText = row.getAttribute('data-search') || '';
+            const match = !q || searchText.includes(q);
+            row.style.display = match ? '' : 'none';
+        });
+
+        // Show/hide the X clear button
+        const clearBtn = document.getElementById('snap-search-clear');
+        if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+
+        // Reset the select-all checkbox
+        const selectAll = document.getElementById('selectAllSnapshots');
+        if (selectAll) {
+            selectAll.indeterminate = false;
+            selectAll.checked = false;
+        }
+        updateSnapshotDeleteState();
+    }
+
+    function clearSnapSearch() {
+        const input = document.getElementById('snap-search-input');
+        if (input) {
+            input.value = '';
+            filterSnapshots('');
+            input.focus();
+        }
+    }
+
     function refreshInventoryPanels() {
         // Refresh snapshots table
         const snapFilters = document.getElementById('snap-filters');
@@ -751,9 +801,13 @@
     }
 
     function toggleAllSnapshots(source) {
-        const checkboxes = document.querySelectorAll('.snapshot-checkbox');
-        checkboxes.forEach(cb => {
-            cb.checked = source.checked;
+        // Only operate on currently VISIBLE rows
+        const rows = document.querySelectorAll('#snapshots-list-target .inventory-list-table tbody tr');
+        rows.forEach(row => {
+            if (row.style.display !== 'none') {
+                const cb = row.querySelector('.snapshot-checkbox');
+                if (cb) cb.checked = source.checked;
+            }
         });
         updateSnapshotDeleteState();
     }

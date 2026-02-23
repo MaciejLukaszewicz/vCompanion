@@ -21,6 +21,7 @@
         {% for snap in global_snapshots %}
         <tr class="vm-row vc-color-{{ snap.vc_color_index }}" data-vm-id="{{ snap.vm_id }}"
             data-vcenter-id="{{ snap.vcenter_id }}"
+            data-search="{{ (snap.vm_name ~ ' ' ~ snap.name ~ ' ' ~ (snap.description or '')) | lower }}"
             hx-get="/api/inventory/vm-details/{{ snap.vcenter_id }}/{{ snap.vm_id }}" hx-target="#vm-details-panel"
             hx-trigger="click" onclick="syncVmSelection('{{ snap.vcenter_id }}', '{{ snap.vm_id }}')">
             <td style="text-align: center;" onclick="event.stopPropagation()">
