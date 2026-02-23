@@ -531,14 +531,28 @@ async def delete_snapshot_endpoint(request: Request):
             raise HTTPException(status_code=400, detail="Missing required parameters")
             
         manager = request.app.state.vcenter_manager
-        success = manager.remove_snapshot(vc_id, vm_id, snap_name)
+        task_id = manager.remove_snapshot(vc_id, vm_id, snap_name)
         
-        if success:
-            return JSONResponse({"success": True})
+        if task_id:
+            return JSONResponse({"success": True, "task_id": task_id})
         else:
             return JSONResponse({"success": False, "error": "Failed to delete snapshot. Check logs."}, status_code=500)
     except Exception as e:
         logger.error(f"Error in delete_snapshot_endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+@router.get("/tasks/{vcenter_id}/{task_id}")
+async def get_task_status(request: Request, vcenter_id: str, task_id: str):
+    """Gets the status of an ongoing task in a vCenter."""
+    if not is_authenticated(request):
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
+        
+    try:
+        manager = request.app.state.vcenter_manager
+        status = manager.check_task_status(vcenter_id, task_id)
+        return JSONResponse({"success": True, "status": status})
+    except Exception as e:
+        logger.error(f"Error checking task status: {e}")
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 @router.post("/snapshots/delete-bulk")
@@ -561,8 +575,8 @@ async def delete_snapshots_bulk_endpoint(request: Request):
             vc_id = snap.get('vcenter_id')
             vm_id = snap.get('vm_id')
             snap_name = snap.get('snapshot_name')
-            success = manager.remove_snapshot(vc_id, vm_id, snap_name)
-            results.append({"snapshot_name": snap_name, "success": success})
+            task_id = manager.remove_snapshot(vc_id, vm_id, snap_name)
+            results.append({"vcenter_id": vc_id, "vm_id": vm_id, "snapshot_name": snap_name, "success": task_id is not None, "task_id": task_id})
             
         return JSONResponse({"success": True, "results": results})
     except Exception as e:

@@ -230,15 +230,22 @@ class VCenterManager:
             self.trigger_refresh(vc_id)
         return success
 
-    def remove_snapshot(self, vc_id: str, vm_mo_id: str, snapshot_name: str) -> bool:
-        """Proxies snapshot removal to specific vCenter and triggers a refresh."""
-        if vc_id not in self.connections: return False
+    def remove_snapshot(self, vc_id: str, vm_mo_id: str, snapshot_name: str):
+        """Proxies snapshot removal to specific vCenter and triggers a refresh. Returns task ID."""
+        if vc_id not in self.connections: return None
         conn = self.connections[vc_id]
-        if not conn.is_alive(): return False
-        success = conn.remove_snapshot(vm_mo_id, snapshot_name)
-        if success:
+        if not conn.is_alive(): return None
+        task_id = conn.remove_snapshot(vm_mo_id, snapshot_name)
+        if task_id:
             self.trigger_refresh(vc_id)
-        return success
+        return task_id
+
+    def check_task_status(self, vc_id: str, task_id: str) -> dict:
+        """Proxies task status check to specific vCenter."""
+        if vc_id not in self.connections: return {"state": "error", "error": "vCenter not found"}
+        conn = self.connections[vc_id]
+        if not conn.is_alive(): return {"state": "error", "error": "vCenter not connected"}
+        return conn.check_task_status(task_id)
 
     def login_vcenter_appliance(self, vc_id, user, password):
         """Authenticates with the VCSA REST API for a specific vCenter."""
@@ -1344,8 +1351,34 @@ class VCenterConnection:
                 
             # Request deletion (removeChildren=False to only remove THIS snapshot)
             task = snap_obj.RemoveSnapshot_Task(removeChildren=False)
-            logger.info(f"[{self.config.name}] Dispatched RemoveSnapshot_Task for VM {vm_mo_id}, Snapshot: {snapshot_name}")
-            return True
+            logger.info(f"[{self.config.name}] Dispatched RemoveSnapshot_Task for VM {vm_mo_id}, Snapshot: {snapshot_name}, Task ID: {task._moId}")
+            return task._moId
         except Exception as e:
             logger.error(f"[{self.config.name}] Failed to remove snapshot: {e}")
-            return False
+            return None
+
+    def check_task_status(self, task_id: str) -> dict:
+        """Checks the status of a scheduled task."""
+        if not self.content: return {"state": "error", "error": "Not connected"}
+        try:
+            task = vim.Task(task_id, stub=self.content.sessionManager._stub)
+            state = getattr(task.info, 'state', getattr(task.info, 'state', None))
+            # PyVmomi encapsulates states into vim.TaskInfo.State (e.g. 'queued', 'running', 'success', 'error')
+            if hasattr(state, 'val'): state = state.val # Unwrap if it's enum
+            elif isinstance(state, type) or callable(state): state = str(state) # Edge cases
+            else: state = str(state)
+
+            res = {
+                "state": state,
+                "progress": getattr(task.info, 'progress', 0)
+            }
+            if state == 'error':
+                task_error = task.info.error
+                if task_error:
+                     res["error"] = getattr(task_error, 'localizedMessage', getattr(task_error, 'msg', str(task_error)))
+                else:
+                     res["error"] = "Unknown error during task execution"
+            return res
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Failed to get task status for {task_id}: {e}")
+            return {"state": "error", "error": str(e)}

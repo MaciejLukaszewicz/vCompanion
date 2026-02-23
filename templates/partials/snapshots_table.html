@@ -42,13 +42,21 @@
             <td style="font-size: 0.75rem; color: var(--text-dim);" title="{{ snap.description }}">{{ snap.description
                 or '--' }}</td>
             <td style="text-align: right;" onclick="event.stopPropagation()">
-                <button type="button" class="btn-icon"
-                    title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete snapshot{% endif %}"
-                    style="color: var(--danger); padding: 0.25rem; {% if not elevated_unlocked %}opacity: 0.3; cursor: not-allowed;{% endif %}"
-                    {% if not elevated_unlocked %}disabled{% endif %}
-                    onclick="deleteSnapshot('{{ snap.vcenter_id }}', '{{ snap.vm_id }}', '{{ snap.name }}', this)">
-                    <i data-lucide="trash-2" size="16"></i>
-                </button>
+                <!-- Privileged Delete Action -->
+                <div
+                    style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.1); padding: 0.2rem 0.4rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}" size="12"
+                        style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }}; opacity: 0.8;"
+                        title="{{ 'Elevated Privileges Unlocked' if elevated_unlocked else 'Elevated Privileges Locked - go to Settings to unlock' }}"></i>
+
+                    <button type="button" class="btn-icon"
+                        title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete snapshot{% endif %}"
+                        style="color: var(--danger); padding: 0.25rem; {% if not elevated_unlocked %}opacity: 0.3; cursor: not-allowed;{% endif %}"
+                        {% if not elevated_unlocked %}disabled{% endif %}
+                        onclick="deleteSnapshot('{{ snap.vcenter_id }}', '{{ snap.vm_id }}', '{{ snap.name }}', this)">
+                        <i data-lucide="trash-2" size="16"></i>
+                    </button>
+                </div>
             </td>
         </tr>
         {% endfor %}

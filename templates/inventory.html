@@ -131,12 +131,20 @@
 
                     <div style="width: 1px; height: 24px; background: var(--border); margin: 0 0.5rem;"></div>
 
-                    <button type="button" class="btn-primary" id="btn-delete-selected-snaps"
-                        title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete selected snapshots{% endif %}"
-                        style="{% if not elevated_unlocked %}opacity: 0.5; cursor: not-allowed;{% endif %} display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: var(--danger); border: none; color: white; border-radius: 4px; font-size: 0.85rem;"
-                        {% if not elevated_unlocked %}disabled{% endif %} onclick="deleteSelectedGlobalSnapshots()">
-                        <i data-lucide=" trash-2" size="14"></i> Delete Selected
-                    </button>
+                    <!-- Privileged Delete Action -->
+                    <div
+                        style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.15); padding: 0.3rem 0.6rem; border-radius: 6px; display: flex; align-items: center; gap: 0.75rem; width: fit-content;">
+                        <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}" size="14"
+                            style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }}; opacity: 0.8;"
+                            title="{{ 'Elevated Privileges Unlocked' if elevated_unlocked else 'Elevated Privileges Locked - go to Settings to unlock' }}"></i>
+
+                        <button type="button" class="btn-primary" id="btn-delete-selected-snaps"
+                            title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete selected snapshots{% endif %}"
+                            style="{% if not elevated_unlocked %}opacity: 0.5; cursor: not-allowed;{% endif %} display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: var(--danger); border: none; color: white; border-radius: 4px; font-size: 0.85rem;"
+                            {% if not elevated_unlocked %}disabled{% endif %} onclick="deleteSelectedGlobalSnapshots()">
+                            <i data-lucide="trash-2" size="14"></i> Delete Selected
+                        </button>
+                    </div>
                 </form>
             </div>
 
@@ -655,6 +663,85 @@
     }
 
     // Snapshot Deletion Logic
+    let activeTaskCount = 0;
+
+    function refreshInventoryPanels() {
+        // Refresh snapshots table
+        const snapFilters = document.getElementById('snap-filters');
+        if (snapFilters) htmx.trigger(snapFilters, 'change');
+
+        // Refresh details pane if a VM is selected
+        const selectedVmId = document.getElementById('selected-vm-id')?.value;
+        const selectedVcId = document.getElementById('selected-vcenter-id')?.value;
+
+        if (selectedVmId && selectedVcId) {
+            const url = `/api/inventory/vm-details/${selectedVcId}/${selectedVmId}`;
+            const detailsPanel = document.getElementById('vm-details-panel');
+            if (detailsPanel) {
+                htmx.ajax('GET', url, { target: '#vm-details-panel', select: '#vm-details-panel' });
+            }
+        }
+    }
+
+    function updateSnapshotIconsState(vcenterId, vmId, snapshotName, isDeleting) {
+        // Find all buttons that match this snapshot in both panels
+        const selector = `button[onclick*="'${vcenterId}'"][onclick*="'${vmId}'"][onclick*="'${snapshotName}'"]`;
+        const buttons = document.querySelectorAll(selector);
+        buttons.forEach(btn => {
+            if (isDeleting) {
+                btn.innerHTML = '<div class="spinner-small" style="width: 14px; height: 14px; border-width: 1px;"></div>';
+                btn.disabled = true;
+                btn.classList.add('is-deleting');
+            } else {
+                btn.innerHTML = '<i data-lucide="trash-2" size="16"></i>';
+                btn.disabled = false;
+                btn.classList.remove('is-deleting');
+                if (window.lucide) lucide.createIcons();
+            }
+        });
+    }
+
+    async function monitorTask(vcenterId, taskId, snapshotName, vmId) {
+        activeTaskCount++;
+        const interval = setInterval(async () => {
+            try {
+                const r = await fetch(`/api/inventory/tasks/${vcenterId}/${taskId}`);
+                const data = await r.json();
+                if (data.success) {
+                    const status = data.status;
+                    // states: 'queued', 'running', 'success', 'error'
+                    if (status.state === 'success' || status.state === 'error') {
+                        clearInterval(interval);
+                        activeTaskCount--;
+
+                        if (status.state === 'success') {
+                            showToast(`Snapshot '${snapshotName}' deleted successfully.`, 'success');
+                            // We don't restore the icon if success, the refresh will handle it
+                        } else {
+                            showToast(`Error deleting '${snapshotName}': ${status.error}`, 'error');
+                            // Restore icons only on error
+                            updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
+                        }
+
+                        if (activeTaskCount === 0) {
+                            setTimeout(refreshInventoryPanels, 1000);
+                        }
+                    }
+                } else {
+                    // API failure - stop monitoring to avoid infinite loop
+                    clearInterval(interval);
+                    activeTaskCount--;
+                    updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
+                }
+            } catch (e) {
+                console.error("Task check failed:", e);
+                clearInterval(interval);
+                activeTaskCount--;
+                updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
+            }
+        }, 5000);
+    }
+
     function toggleAllSnapshots(source) {
         const checkboxes = document.querySelectorAll('.snapshot-checkbox');
         checkboxes.forEach(cb => {
@@ -669,19 +756,14 @@
         const btnTitle = document.getElementById('btn-delete-selected-snaps');
         if (btnTitle) {
             btnTitle.innerHTML = `<i data-lucide="trash-2" size="14"></i> Delete Selected (${count})`;
-            if (window.lucide) {
-                lucide.createIcons();
-            }
+            if (window.lucide) lucide.createIcons();
         }
     }
 
     async function deleteSnapshot(vcenterId, vmId, snapshotName, btnElem) {
         if (!confirm(`Are you sure you want to delete snapshot '${snapshotName}'?`)) return;
 
-        // Visual feedback
-        const originalIcon = btnElem.innerHTML;
-        btnElem.innerHTML = '<div class="spinner-small" style="width: 14px; height: 14px; border-width: 1px;"></div>';
-        btnElem.disabled = true;
+        updateSnapshotIconsState(vcenterId, vmId, snapshotName, true);
 
         try {
             const res = await fetch('/api/inventory/snapshots/delete', {
@@ -695,24 +777,17 @@
             });
 
             const data = await res.json();
-            if (data.success) {
-                showToast(`Snapshot '${snapshotName}' deletion initiated.`, 'success');
-                // Trigger reload
-                htmx.trigger('#snap-filters', 'change');
-                if (document.getElementById('vm-details-panel')) {
-                    // Update VM details if showing
-                    htmx.trigger(`#vm-details-panel [hx-get]`, 'click');
-                }
+            if (data.success && data.task_id) {
+                showToast(`Snapshot '${snapshotName}' deletion initiated.`, 'info');
+                monitorTask(vcenterId, data.task_id, snapshotName, vmId);
             } else {
                 showToast(data.error || 'Failed to delete snapshot', 'error');
-                btnElem.innerHTML = originalIcon;
-                btnElem.disabled = false;
+                updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
             }
         } catch (error) {
             console.error('Error deleting snapshot:', error);
             showToast('Network error while deleting snapshot.', 'error');
-            btnElem.innerHTML = originalIcon;
-            btnElem.disabled = false;
+            updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
         }
     }
 
@@ -731,9 +806,9 @@
         btnTitle.innerHTML = '<div class="spinner-small" style="width: 14px; height: 14px; border-width: 1px;"></div> Deleting...';
         btnTitle.disabled = true;
 
-        const snapshots = [];
+        const snapshotsToProcess = [];
         checkboxes.forEach(cb => {
-            snapshots.push({
+            snapshotsToProcess.push({
                 vcenter_id: cb.getAttribute('data-vcenter-id'),
                 vm_id: cb.getAttribute('data-vm-id'),
                 snapshot_name: cb.value
@@ -744,13 +819,24 @@
             const res = await fetch('/api/inventory/snapshots/delete-bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ snapshots: snapshots })
+                body: JSON.stringify({ snapshots: snapshotsToProcess })
             });
 
             const data = await res.json();
-            if (data.success) {
-                showToast(`Successfully initiated deletion of ${count} snapshots.`, 'success');
-                htmx.trigger('#snap-filters', 'change');
+            if (data.success && data.results) {
+                let startedCount = 0;
+                data.results.forEach(resItem => {
+                    if (resItem.success && resItem.task_id) {
+                        startedCount++;
+                        updateSnapshotIconsState(resItem.vcenter_id, resItem.vm_id, resItem.snapshot_name, true);
+                        monitorTask(resItem.vcenter_id, resItem.task_id, resItem.snapshot_name, resItem.vm_id);
+                    } else {
+                        showToast(`Failed to initiate deletion for '${resItem.snapshot_name}'`, 'warning');
+                    }
+                });
+                if (startedCount > 0) {
+                    showToast(`Successfully initiated deletion of ${startedCount} snapshots.`, 'info');
+                }
             } else {
                 showToast(data.error || 'Failed to delete selected snapshots', 'error');
             }
@@ -760,8 +846,12 @@
         } finally {
             btnTitle.innerHTML = originalText;
             btnTitle.disabled = false;
-            if (window.lucide) {
-                lucide.createIcons();
+            if (window.lucide) lucide.createIcons();
+            // Clear selections
+            const selectAllCheck = document.getElementById('selectAllSnapshots');
+            if (selectAllCheck) {
+                selectAllCheck.checked = false;
+                toggleAllSnapshots(selectAllCheck);
             }
         }
     }
