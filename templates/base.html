@@ -111,6 +111,114 @@
         style="position: fixed; bottom: 2rem; right: 2rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.75rem;">
     </div>
 
+    <!-- Global Confirm Dialog -->
+    <div id="confirm-modal"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); backdrop-filter:blur(5px); z-index:10000; align-items:center; justify-content:center;">
+        <div
+            style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.75rem 2rem; width:400px; max-width:92vw; box-shadow:0 30px 70px rgba(0,0,0,0.6);">
+            <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">
+                <span id="confirm-icon-wrap"
+                    style="width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:rgba(239,68,68,0.15);">
+                    <i id="confirm-icon" data-lucide="triangle-alert" size="18" style="color:var(--danger);"></i>
+                </span>
+                <h3 id="confirm-title" style="margin:0; font-size:1rem; font-weight:600;"></h3>
+            </div>
+            <p id="confirm-message"
+                style="font-size:0.875rem; color:var(--text-dim); margin:0 0 1.5rem 0; line-height:1.6;"></p>
+            <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+                <button id="confirm-cancel-btn" onclick="_confirmResolve(false)"
+                    style="padding:0.5rem 1.1rem; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:6px; color:var(--text-main); cursor:pointer; font-size:0.875rem;">
+                    Cancel
+                </button>
+                <button id="confirm-ok-btn" onclick="_confirmResolve(true)"
+                    style="padding:0.5rem 1.25rem; border:none; border-radius:6px; color:white; cursor:pointer; font-size:0.875rem; font-weight:500; display:flex; align-items:center; gap:0.4rem; background:var(--danger);">
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── Global Confirm Utility ──────────────────────────────────────────────
+        let _confirmResolve = null;
+
+        /**
+         * showConfirm({ title, message, confirmLabel, variant })
+         * variant: 'danger' (default) | 'warning' | 'info'
+         * Returns a Promise<boolean>
+         */
+        function showConfirm({ title = 'Are you sure?', message = '', confirmLabel = 'Confirm', variant = 'danger' } = {}) {
+            return new Promise(resolve => {
+                const modal = document.getElementById('confirm-modal');
+                const iconWrap = document.getElementById('confirm-icon-wrap');
+                const icon = document.getElementById('confirm-icon');
+                const titleEl = document.getElementById('confirm-title');
+                const msgEl = document.getElementById('confirm-message');
+                const okBtn = document.getElementById('confirm-ok-btn');
+
+                const palette = {
+                    danger: { bg: 'rgba(239,68,68,0.15)', color: 'var(--danger)', btnBg: 'var(--danger)', lucide: 'triangle-alert' },
+                    warning: { bg: 'rgba(245,158,11,0.15)', color: 'var(--warning)', btnBg: 'var(--warning)', lucide: 'alert-circle' },
+                    info: { bg: 'rgba(99,102,241,0.15)', color: 'var(--primary)', btnBg: 'var(--primary)', lucide: 'info' },
+                };
+                const p = palette[variant] || palette.danger;
+
+                iconWrap.style.background = p.bg;
+                icon.style.color = p.color;
+                icon.setAttribute('data-lucide', p.lucide);
+                okBtn.style.background = p.btnBg;
+                okBtn.innerHTML = `<i data-lucide="check" size="14"></i> ${confirmLabel}`;
+
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+
+                if (window.lucide) lucide.createIcons();
+
+                modal.style.display = 'flex';
+                document.getElementById('confirm-ok-btn').focus();
+
+                _confirmResolve = (result) => {
+                    modal.style.display = 'none';
+                    _confirmResolve = () => { };
+                    resolve(result);
+                };
+            });
+        }
+
+        // Close on backdrop click or ESC
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('confirm-modal').addEventListener('click', e => {
+                if (e.target === document.getElementById('confirm-modal')) _confirmResolve && _confirmResolve(false);
+            });
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape' && document.getElementById('confirm-modal').style.display === 'flex') {
+                    _confirmResolve && _confirmResolve(false);
+                }
+            });
+
+            // ── Intercept HTMX Confirmations ────────────────────────────────────
+            document.body.addEventListener('htmx:confirm', async (evt) => {
+                // Only intercept if hx-confirm has a message
+                if (!evt.detail.question) return;
+
+                // Prevent the action from starting immediately
+                evt.preventDefault();
+
+                const message = evt.detail.question;
+                const confirmed = await showConfirm({
+                    title: 'Confirmation Required',
+                    message: message,
+                    confirmLabel: 'Proceed',
+                    variant: 'danger'
+                });
+
+                if (confirmed) {
+                    // If confirmed, trigger the original action
+                    evt.detail.issueRequest();
+                }
+            });
+        });
+    </script>
+
     <!-- Login Modal -->
     <div id="loginModal" class="modal">
         <div class="modal-content">

@@ -129,10 +129,15 @@
 <script>
     if (typeof refreshIcons === 'function') refreshIcons();
 
-    function handlePurgeResponse(event) {
+    async function handlePurgeResponse(event) {
         const response = JSON.parse(event.detail.xhr.response);
         if (response.status === 'ok') {
-            alert(response.message);
+            await showConfirm({
+                title: 'Cache Purged',
+                message: response.message,
+                confirmLabel: 'Log In Again',
+                variant: 'info'
+            });
             window.location.href = '/login';
         }
     }

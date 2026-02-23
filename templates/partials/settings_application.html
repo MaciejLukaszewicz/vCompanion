@@ -306,7 +306,13 @@
     });
 
     async function restartServer(withRedirect = false) {
-        if (!confirm('Are you sure you want to restart the application server? All active sessions will be dropped.')) return;
+        const confirmed = await showConfirm({
+            title: 'Restart Server',
+            message: 'Are you sure you want to restart the application server? All active sessions will be dropped.',
+            confirmLabel: 'Restart',
+            variant: 'warning'
+        });
+        if (!confirmed) return;
 
         const portInput = document.getElementById('app-port-input');
         const newPort = portInput.value;
@@ -374,12 +380,18 @@
             }, 1000);
 
         } catch (err) {
-            alert('Error triggering restart: ' + err);
+            showToast('Error triggering restart: ' + err, 'error');
         }
     }
 
     async function shutdownServer() {
-        if (!confirm('Are you sure you want to SHUTDOWN the application server? It will stop running entirely.')) return;
+        const confirmed = await showConfirm({
+            title: 'Shutdown Server',
+            message: 'Are you sure you want to SHUTDOWN the application server? It will stop running entirely.',
+            confirmLabel: 'Shutdown',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
 
         try {
             const response = await fetch('/api/settings/shutdown', { method: 'POST' });
@@ -403,7 +415,7 @@
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
         } catch (err) {
-            alert('Error triggering shutdown: ' + err);
+            showToast('Error triggering shutdown: ' + err, 'error');
         }
     }
 

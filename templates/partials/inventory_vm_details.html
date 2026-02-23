@@ -62,7 +62,7 @@
                     style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--primary); padding: 0.15rem 0; {% if not elevated_unlocked %}opacity: 0.3; cursor: not-allowed;{% endif %}"
                     {% if not elevated_unlocked %}disabled{% endif %}
                     onclick="openTakeSnapshotModal('{{ vm.vcenter_id }}', '{{ vm.id }}', '{{ vm.name }}')">
-                    <i data-lucide="camera-plus" size="14"></i> Take Snapshot
+                    <i data-lucide="camera" size="14"></i> Take Snapshot
                 </button>
             </div>
         </div>

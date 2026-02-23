@@ -18,7 +18,7 @@
         style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; width: 420px; max-width: 95vw; box-shadow: 0 25px 60px rgba(0,0,0,0.5);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
             <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <i data-lucide="camera-plus" size="18" style="color: var(--primary);"></i>
+                <i data-lucide="camera" size="18" style="color: var(--primary);"></i>
                 <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">Take Snapshot</h3>
             </div>
             <button onclick="closeTakeSnapshotModal()"
@@ -52,7 +52,7 @@
             </button>
             <button type="button" id="take-snap-submit-btn" onclick="submitTakeSnapshot()"
                 style="padding: 0.5rem 1.25rem; background: var(--primary); border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
-                <i data-lucide="camera-plus" size="14"></i> Take Snapshot
+                <i data-lucide="camera" size="14"></i> Take Snapshot
             </button>
         </div>
     </div>
@@ -870,7 +870,13 @@
     }
 
     async function deleteSnapshot(vcenterId, vmId, snapshotName, btnElem) {
-        if (!confirm(`Are you sure you want to delete snapshot '${snapshotName}'?`)) return;
+        const confirmed = await showConfirm({
+            title: 'Delete Snapshot',
+            message: `Are you sure you want to delete snapshot '${snapshotName}'? This action cannot be undone.`,
+            confirmLabel: 'Delete',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
 
         updateSnapshotIconsState(vcenterId, vmId, snapshotName, true);
 
@@ -908,7 +914,13 @@
             return;
         }
 
-        if (!confirm(`Are you sure you want to delete ${count} selected snapshot(s)?`)) return;
+        const confirmed = await showConfirm({
+            title: 'Delete Selected Snapshots',
+            message: `Are you sure you want to delete ${count} selected snapshot(s)? This action cannot be undone.`,
+            confirmLabel: 'Delete All',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
 
         const btnTitle = document.getElementById('btn-delete-selected-snaps');
         const originalText = btnTitle.innerHTML;
