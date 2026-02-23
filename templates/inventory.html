@@ -11,6 +11,53 @@
     </div>
 </header>
 
+<!-- Take Snapshot Modal -->
+<div id="take-snapshot-modal"
+    style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 9000; align-items: center; justify-content: center;">
+    <div
+        style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; width: 420px; max-width: 95vw; box-shadow: 0 25px 60px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <i data-lucide="camera-plus" size="18" style="color: var(--primary);"></i>
+                <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">Take Snapshot</h3>
+            </div>
+            <button onclick="closeTakeSnapshotModal()"
+                style="background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0.25rem;">
+                <i data-lucide="x" size="18"></i>
+            </button>
+        </div>
+
+        <p id="take-snap-vm-label"
+            style="font-size: 0.8rem; color: var(--text-dim); margin: 0 0 1.25rem 0; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.04); border-radius: 4px;">
+        </p>
+
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Snapshot
+                Name <span style="color: var(--danger);">*</span></label>
+            <input type="text" id="take-snap-name" placeholder="e.g. Before patch 2025-02"
+                style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; box-sizing: border-box;">
+        </div>
+
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Comment
+                (optional)</label>
+            <textarea id="take-snap-desc" rows="3" placeholder="Short description of why this snapshot was taken…"
+                style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; resize: vertical; box-sizing: border-box;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+            <button type="button" onclick="closeTakeSnapshotModal()"
+                style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); cursor: pointer; font-size: 0.875rem;">
+                Cancel
+            </button>
+            <button type="button" id="take-snap-submit-btn" onclick="submitTakeSnapshot()"
+                style="padding: 0.5rem 1.25rem; background: var(--primary); border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="camera-plus" size="14"></i> Take Snapshot
+            </button>
+        </div>
+    </div>
+</div>
+
 <div class="inventory-container" style="display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1rem;">
     <!-- VMs Section -->
     <section class="table-container" id="vms-section">
@@ -944,6 +991,88 @@
     document.addEventListener('DOMContentLoaded', () => {
         window.isSearchFocused = false;
         initInventoryResizers();
+    });
+
+    // --- Take Snapshot Modal ---
+    let _snapModalVcId = null;
+    let _snapModalVmId = null;
+
+    function openTakeSnapshotModal(vcenterId, vmId, vmName) {
+        _snapModalVcId = vcenterId;
+        _snapModalVmId = vmId;
+
+        document.getElementById('take-snap-vm-label').textContent = `VM: ${vmName}`;
+        document.getElementById('take-snap-name').value = '';
+        document.getElementById('take-snap-desc').value = '';
+
+        const modal = document.getElementById('take-snapshot-modal');
+        modal.style.display = 'flex';
+        if (window.lucide) lucide.createIcons();
+        setTimeout(() => document.getElementById('take-snap-name').focus(), 50);
+    }
+
+    function closeTakeSnapshotModal() {
+        document.getElementById('take-snapshot-modal').style.display = 'none';
+        _snapModalVcId = null;
+        _snapModalVmId = null;
+    }
+
+    async function submitTakeSnapshot() {
+        const name = document.getElementById('take-snap-name').value.trim();
+        const desc = document.getElementById('take-snap-desc').value.trim();
+
+        if (!name) {
+            document.getElementById('take-snap-name').style.borderColor = 'var(--danger)';
+            document.getElementById('take-snap-name').focus();
+            return;
+        }
+        document.getElementById('take-snap-name').style.borderColor = '';
+
+        const btn = document.getElementById('take-snap-submit-btn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<div class="spinner-small" style="width: 14px; height: 14px; border-width: 1px;"></div> Creating...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/inventory/snapshots/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    vcenter_id: _snapModalVcId,
+                    vm_id: _snapModalVmId,
+                    snapshot_name: name,
+                    snapshot_description: desc
+                })
+            });
+
+            const data = await res.json();
+            if (data.success && data.task_id) {
+                const vcId = _snapModalVcId;
+                const vmId = _snapModalVmId;
+                closeTakeSnapshotModal();
+                showToast(`Snapshot '${name}' creation initiated.`, 'info');
+                monitorTask(vcId, data.task_id, name, vmId);
+            } else {
+                showToast(data.error || 'Failed to create snapshot', 'error');
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+                if (window.lucide) lucide.createIcons();
+            }
+        } catch (error) {
+            console.error('Error creating snapshot:', error);
+            showToast('Network error while creating snapshot.', 'error');
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+
+    // Close modal on ESC or backdrop click
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeTakeSnapshotModal();
+    });
+    document.getElementById('take-snapshot-modal').addEventListener('click', e => {
+        if (e.target === document.getElementById('take-snapshot-modal')) closeTakeSnapshotModal();
     });
 </script>
 {% endblock %}

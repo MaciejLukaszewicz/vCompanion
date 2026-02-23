@@ -247,6 +247,16 @@ class VCenterManager:
         if not conn.is_alive(): return {"state": "error", "error": "vCenter not connected"}
         return conn.check_task_status(task_id)
 
+    def create_snapshot(self, vc_id: str, vm_mo_id: str, name: str, description: str = "") -> str | None:
+        """Proxies snapshot creation to specific vCenter and triggers a refresh. Returns task ID."""
+        if vc_id not in self.connections: return None
+        conn = self.connections[vc_id]
+        if not conn.is_alive(): return None
+        task_id = conn.create_snapshot(vm_mo_id, name, description)
+        if task_id:
+            self.trigger_refresh(vc_id)
+        return task_id
+
     def login_vcenter_appliance(self, vc_id, user, password):
         """Authenticates with the VCSA REST API for a specific vCenter."""
         if vc_id not in self.connections: return "vc_not_found"
@@ -1382,3 +1392,24 @@ class VCenterConnection:
         except Exception as e:
             logger.error(f"[{self.config.name}] Failed to get task status for {task_id}: {e}")
             return {"state": "error", "error": str(e)}
+
+    def create_snapshot(self, vm_mo_id: str, name: str, description: str = "") -> str | None:
+        """Creates a snapshot on a given VM. Returns task ID or None on failure."""
+        if not self.content: return None
+        try:
+            vm = vim.VirtualMachine(vm_mo_id, stub=self.content.sessionManager._stub)
+            if not vm:
+                logger.error(f"[{self.config.name}] VM {vm_mo_id} not found.")
+                return None
+            task = vm.CreateSnapshot_Task(
+                name=name,
+                description=description,
+                memory=False,
+                quiesce=False
+            )
+            logger.info(f"[{self.config.name}] Dispatched CreateSnapshot_Task for VM {vm_mo_id}, name='{name}', task={task._moId}")
+            return task._moId
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Failed to create snapshot: {e}")
+            return None
+

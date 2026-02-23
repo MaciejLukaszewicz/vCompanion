@@ -514,6 +514,34 @@ async def get_snapshots_partial(request: Request, today_only: bool = False):
         "elevated_unlocked": is_elevated_unlocked(request)
     })
 
+@router.post("/snapshots/create")
+async def create_snapshot_endpoint(request: Request):
+    """Creates a new snapshot on a VM. Requires elevated privileges."""
+    require_auth(request)
+    if not is_elevated_unlocked(request):
+        return JSONResponse({"success": False, "error": "Elevated privileges required"}, status_code=403)
+
+    try:
+        data = await request.json()
+        vc_id = data.get('vcenter_id')
+        vm_id = data.get('vm_id')
+        snap_name = data.get('snapshot_name', '').strip()
+        snap_desc = data.get('snapshot_description', '').strip()
+
+        if not all([vc_id, vm_id, snap_name]):
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+
+        manager = request.app.state.vcenter_manager
+        task_id = manager.create_snapshot(vc_id, vm_id, snap_name, snap_desc)
+
+        if task_id:
+            return JSONResponse({"success": True, "task_id": task_id})
+        else:
+            return JSONResponse({"success": False, "error": "Failed to create snapshot. Check logs."}, status_code=500)
+    except Exception as e:
+        logger.error(f"Error in create_snapshot_endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
 @router.post("/snapshots/delete")
 async def delete_snapshot_endpoint(request: Request):
     """Deletes a specific snapshot. Requires elevated privileges."""
