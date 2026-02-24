@@ -58,6 +58,84 @@
     </div>
 </div>
 
+<!-- Batch Snapshot Modal -->
+<div id="batch-snapshot-modal"
+    style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 9005; align-items: center; justify-content: center;">
+    <div
+        style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; width: 600px; max-width: 95vw; box-shadow: 0 25px 60px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <i data-lucide="layers" size="18" style="color: var(--primary);"></i>
+                <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">Batch Take Snapshots</h3>
+            </div>
+            <button onclick="closeBatchSnapshotModal()" id="batch-snap-close-x"
+                style="background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0.25rem;">
+                <i data-lucide="x" size="18"></i>
+            </button>
+        </div>
+
+        <div id="batch-snap-input-view">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label
+                        style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Snapshot
+                        Name <span style="color: var(--danger);">*</span></label>
+                    <input type="text" id="batch-snap-name" placeholder="e.g. Patching Window"
+                        style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; box-sizing: border-box;">
+                </div>
+                <div>
+                    <label
+                        style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Comment
+                        (optional)</label>
+                    <input type="text" id="batch-snap-desc" placeholder="e.g. Critical security updates"
+                        style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; box-sizing: border-box;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label
+                    style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Virtual
+                    Machines List (one per line) <span style="color: var(--danger);">*</span></label>
+                <textarea id="batch-snap-vmlist" rows="8" placeholder="VM-NAME-01&#10;VM-NAME-02&#10;..."
+                    style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; resize: none; font-family: monospace; box-sizing: border-box;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                <button type="button" onclick="closeBatchSnapshotModal()"
+                    style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); cursor: pointer; font-size: 0.875rem;">
+                    Cancel
+                </button>
+                <button type="button" id="batch-snap-submit-btn" onclick="submitBatchSnapshots()"
+                    style="padding: 0.5rem 1.25rem; background: var(--primary); border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="play" size="14"></i> Start Batch Process
+                </button>
+            </div>
+        </div>
+
+        <div id="batch-snap-progress-view" style="display: none;">
+            <div
+                style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(var(--primary-rgb), 0.1); border-radius: 6px; border: 1px dashed var(--primary);">
+                <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary);" id="batch-snap-current-status">
+                    Initializing...</div>
+                <div style="font-size: 0.75rem; color: var(--text-dim);" id="batch-snap-overall-progress">Objects: 0 / 0
+                </div>
+            </div>
+
+            <div id="batch-snap-results-list"
+                style="max-height: 300px; overflow-y: auto; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem;">
+                <!-- Result lines injected here -->
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+                <button type="button" id="batch-snap-finish-btn" onclick="closeBatchSnapshotModal()" disabled
+                    style="padding: 0.5rem 1.25rem; background: var(--border); border: none; border-radius: 6px; color: var(--text-dim); cursor: not-allowed; font-size: 0.875rem;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="inventory-container" style="display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1rem;">
     <!-- VMs Section -->
     <section class="table-container" id="vms-section">
@@ -203,6 +281,12 @@
                     <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}" size="14"
                         style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }}; opacity: 0.8;"
                         title="{{ 'Elevated Privileges Unlocked' if elevated_unlocked else 'Elevated Privileges Locked - go to Settings to unlock' }}"></i>
+                    <button type="button" class="btn-primary" id="btn-batch-snap"
+                        title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Take batch snapshots for multiple VMs{% endif %}"
+                        style="{% if not elevated_unlocked %}opacity: 0.5; cursor: not-allowed;{% endif %} display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: var(--primary); border: none; color: white; border-radius: 4px; font-size: 0.85rem;"
+                        {% if not elevated_unlocked %}disabled{% endif %} onclick="openBatchSnapshotModal()">
+                        <i data-lucide="layers" size="14"></i> Batch Snapshots
+                    </button>
                     <button type="button" class="btn-primary" id="btn-delete-selected-snaps"
                         title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete selected snapshots{% endif %}"
                         style="{% if not elevated_unlocked %}opacity: 0.5; cursor: not-allowed;{% endif %} display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: var(--danger); border: none; color: white; border-radius: 4px; font-size: 0.85rem;"
@@ -997,6 +1081,163 @@
         }).catch(() => {
             if (icon) icon.style.animation = '';
         });
+    }
+
+    // --- Batch Snapshot Logic ---
+    async function openBatchSnapshotModal() {
+        document.getElementById('batch-snapshot-modal').style.display = 'flex';
+        document.getElementById('batch-snap-input-view').style.display = 'block';
+        document.getElementById('batch-snap-progress-view').style.display = 'none';
+        document.getElementById('batch-snap-name').value = '';
+        document.getElementById('batch-snap-desc').value = '';
+        document.getElementById('batch-snap-vmlist').value = '';
+        document.getElementById('batch-snap-finish-btn').disabled = true;
+        document.getElementById('batch-snap-finish-btn').style.background = 'var(--border)';
+        document.getElementById('batch-snap-finish-btn').style.cursor = 'not-allowed';
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function closeBatchSnapshotModal() {
+        document.getElementById('batch-snapshot-modal').style.display = 'none';
+    }
+
+    async function submitBatchSnapshots() {
+        const name = document.getElementById('batch-snap-name').value.trim();
+        const desc = document.getElementById('batch-snap-desc').value.trim();
+        const vmlistText = document.getElementById('batch-snap-vmlist').value.trim();
+
+        if (!name || !vmlistText) {
+            showToast('Name and VM list are required.', 'warning');
+            return;
+        }
+
+        const vmnames = vmlistText.split('\n').map(v => v.trim()).filter(v => v !== '');
+        if (vmnames.length === 0) {
+            showToast('No valid VM names provided.', 'warning');
+            return;
+        }
+
+        // Confirm start
+        const confirmed = await showConfirm({
+            title: 'Batch Snapshot Process',
+            message: `You are about to process ${vmnames.length} virtual machine(s). This process will run sequentially. Proceed?`,
+            confirmLabel: 'Start Process',
+            variant: 'info'
+        });
+        if (!confirmed) return;
+
+        // Switch to progress view
+        document.getElementById('batch-snap-input-view').style.display = 'none';
+        document.getElementById('batch-snap-progress-view').style.display = 'block';
+        document.getElementById('batch-snap-close-x').style.display = 'none'; // Lock dialog during process
+
+        const resultsList = document.getElementById('batch-snap-results-list');
+        resultsList.innerHTML = '';
+
+        const rows = [];
+        vmnames.forEach((vmname) => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.style.padding = '0.55rem 0.75rem';
+            row.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            row.style.fontSize = '0.85rem';
+            row.innerHTML = `
+                <span style="font-family: monospace; color: var(--text-main);">${vmname}</span>
+                <span class="batch-status" style="color: var(--text-dim); display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="clock" size="14"></i> In queue</span>
+            `;
+            resultsList.appendChild(row);
+            rows.push(row);
+        });
+        if (window.lucide) lucide.createIcons();
+
+        // Sequential processing
+        for (let i = 0; i < vmnames.length; i++) {
+            const vmname = vmnames[i];
+            const row = rows[i];
+            const statusLabel = row.querySelector('.batch-status');
+
+            document.getElementById('batch-snap-current-status').innerText = `Current Task: Creating snapshot for "${vmname}"...`;
+            document.getElementById('batch-snap-overall-progress').innerText = `Batch Progress: ${i + 1} / ${vmnames.length}`;
+            statusLabel.innerHTML = `<span style="color: var(--primary); display: flex; align-items: center; gap: 0.5rem;"><div class="spinner-small" style="width:12px; height:12px; border-width:1px;"></div> Working...</span>`;
+
+            try {
+                // 1. Lookup VM
+                const lookupRes = await fetch(`/api/inventory/lookup-vm/${encodeURIComponent(vmname)}`);
+                if (!lookupRes.ok) throw new Error('VM not found in inventory');
+                const vmInfo = await lookupRes.json();
+
+                // 2. Create Snapshot
+                const createRes = await fetch('/api/inventory/snapshots/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        vcenter_id: vmInfo.vcenter_id,
+                        vm_id: vmInfo.vm_id,
+                        snapshot_name: name,
+                        snapshot_description: desc
+                    })
+                });
+                const createData = await createRes.json();
+                if (!createData.task_id) throw new Error(createData.error || 'Snap creation rejected by vCenter');
+
+                // 3. Monitor Task
+                const taskId = createData.task_id;
+                const vcId = vmInfo.vcenter_id;
+                let finished = false;
+
+                while (!finished) {
+                    await new Promise(r => setTimeout(r, 4000));
+                    const taskRes = await fetch(`/api/inventory/tasks/${vcId}/${taskId}`);
+                    const taskData = await taskRes.json();
+                    if (taskData.success) {
+                        if (taskData.status.state === 'success') {
+                            finished = true;
+                        } else if (taskData.status.state === 'error') {
+                            throw new Error(taskData.status.error || 'vCenter task failed');
+                        }
+                    } else {
+                        throw new Error('Task monitoring connection lost');
+                    }
+                }
+
+                // 4. Verify Snapshot presence
+                let verified = false;
+                for (let retry = 0; retry < 6; retry++) {
+                    // Refresh is triggered by create_snapshot in background, but might take time
+                    const verifyRes = await fetch(`/api/inventory/verify-snapshot/${vcId}/${vmInfo.vm_id}/${encodeURIComponent(name)}`);
+                    const verifyData = await verifyRes.json();
+                    if (verifyData.found) {
+                        verified = true;
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 3000));
+                }
+
+                if (verified) {
+                    statusLabel.innerHTML = `<span style="color: var(--success); display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="check-circle" size="14"></i> Created</span>`;
+                } else {
+                    statusLabel.innerHTML = `<span style="color: var(--warning); display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="help-circle" size="14"></i> Unverified</span>`;
+                }
+
+            } catch (err) {
+                console.error(`Batch error for ${vmname}:`, err);
+                statusLabel.innerHTML = `<span style="color: var(--danger); display: flex; align-items: center; gap: 0.5rem;" title="${err.message}"><i data-lucide="alert-circle" size="14"></i> Failed</span>`;
+            }
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Finalize
+        document.getElementById('batch-snap-current-status').innerText = `Batch Process Completed`;
+        document.getElementById('batch-snap-close-x').style.display = 'block';
+
+        const finishBtn = document.getElementById('batch-snap-finish-btn');
+        finishBtn.disabled = false;
+        finishBtn.style.background = 'var(--primary)';
+        finishBtn.style.color = 'white';
+        finishBtn.style.cursor = 'pointer';
+
+        refreshInventoryPanels();
     }
 
     // Initialize on load

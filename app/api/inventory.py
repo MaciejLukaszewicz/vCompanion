@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
-from app.core.session import require_auth, is_elevated_unlocked
+from app.core.session import require_auth, is_elevated_unlocked, is_authenticated
 import logging
 import csv
 import io
@@ -73,6 +73,41 @@ async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = Fals
         "selected_vm_id": selected_vm_id,
         "selected_vcenter_id": selected_vcenter_id
     })
+
+@router.get("/lookup-vm/{name}")
+async def lookup_vm_by_name(request: Request, name: str):
+    """Looks up a VM by name across all vCenters. Returns basic info if found."""
+    require_auth(request)
+    vms = request.app.state.vcenter_manager.cache.get_all_vms()
+    
+    # Simple exact match
+    match = next((v for v in vms if v.get('name').lower() == name.lower()), None)
+    if not match:
+        # Try partial match if no exact
+        match = next((v for v in vms if name.lower() in v.get('name').lower()), None)
+    
+    if match:
+        return {
+            "name": match.get('name'),
+            "vcenter_id": match.get('vcenter_id'),
+            "vm_id": match.get('id')
+        }
+    
+    return JSONResponse(status_code=404, content={"message": "VM not found"})
+
+@router.get("/verify-snapshot/{vcenter_id}/{vm_id}/{snapshot_name}")
+async def verify_snapshot(request: Request, vcenter_id: str, vm_id: str, snapshot_name: str):
+    """Verifies if a snapshot exists for a given VM in the cache."""
+    require_auth(request)
+    vms = request.app.state.vcenter_manager.cache.get_all_vms()
+    vm = next((v for v in vms if v.get('vcenter_id') == vcenter_id and v.get('id') == vm_id), None)
+    
+    if not vm:
+        return {"found": False, "message": "VM not found in cache"}
+        
+    snaps = vm.get('snapshots', [])
+    found = any(s.get('name') == snapshot_name for s in snaps)
+    return {"found": found}
 
 @router.get("/vm-details/{vcenter_id}/{vm_id}")
 async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
