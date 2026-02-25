@@ -80,7 +80,7 @@
                     <label
                         style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Snapshot
                         Name <span style="color: var(--danger);">*</span></label>
-                    <input type="text" id="batch-snap-name" placeholder="e.g. Patching Window"
+                    <input type="text" id="batch-snap-name" placeholder="e.g. Patching Window" autocomplete="off"
                         style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; box-sizing: border-box;">
                 </div>
                 <div>
@@ -88,6 +88,7 @@
                         style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Comment
                         (optional)</label>
                     <input type="text" id="batch-snap-desc" placeholder="e.g. Critical security updates"
+                        autocomplete="off"
                         style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; box-sizing: border-box;">
                 </div>
             </div>
@@ -314,7 +315,8 @@
         </div>
 
         <div id="snapshots-content" style="display: none; height: 400px; overflow-y: auto;"
-            hx-get="/api/inventory/snapshots" hx-trigger="load" hx-target="#snapshots-list-target">
+            hx-get="/api/inventory/snapshots" hx-trigger="load, vcenter-refreshed from:body"
+            hx-target="#snapshots-list-target">
             <div id="snapshots-list-target">
                 <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
                     <div class="spinner-small" style="margin-bottom: 1rem;"></div>
@@ -905,7 +907,8 @@
 
                         if (status.state === 'success') {
                             showToast(`Snapshot '${snapshotName}' deleted successfully.`, 'success');
-                            // We don't restore the icon if success, the refresh will handle it
+                            // Trigger a targeted refresh for this vCenter after success
+                            fetch(`/api/vcenters/refresh/${vcenterId}`, { method: 'POST' });
                         } else {
                             showToast(`Error deleting '${snapshotName}': ${status.error}`, 'error');
                             // Restore icons only on error
@@ -998,11 +1001,45 @@
             return;
         }
 
+        let snapshotRows = '';
+        checkboxes.forEach(cb => {
+            const vmName = cb.getAttribute('data-vm-name') || 'Unknown';
+            const snapName = cb.value;
+            const created = cb.getAttribute('data-created') || '--';
+            const desc = cb.getAttribute('data-description') || '--';
+
+            snapshotRows += `
+                <tr>
+                    <td style="padding: 0.5rem; border-bottom: 1px solid var(--border);">${vmName}</td>
+                    <td style="padding: 0.5rem; border-bottom: 1px solid var(--border); color: var(--primary);">${snapName}</td>
+                    <td style="padding: 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.75rem;">${created}</td>
+                    <td style="padding: 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--text-dim);">${desc}</td>
+                </tr>
+            `;
+        });
+
+        const tableHtml = `
+            <div style="margin-top: 1rem; max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+                    <thead style="background: var(--surface); position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th style="padding: 0.6rem 0.5rem; border-bottom: 2px solid var(--border);">VM</th>
+                            <th style="padding: 0.6rem 0.5rem; border-bottom: 2px solid var(--border);">Snapshot</th>
+                            <th style="padding: 0.6rem 0.5rem; border-bottom: 2px solid var(--border);">Created</th>
+                            <th style="padding: 0.6rem 0.5rem; border-bottom: 2px solid var(--border);">Desc</th>
+                        </tr>
+                    </thead>
+                    <tbody>${snapshotRows}</tbody>
+                </table>
+            </div>
+        `;
+
         const confirmed = await showConfirm({
             title: 'Delete Selected Snapshots',
-            message: `Are you sure you want to delete ${count} selected snapshot(s)? This action cannot be undone.`,
+            message: `Are you sure you want to delete <b>${count}</b> selected snapshot(s)? This action cannot be undone.${tableHtml}`,
             confirmLabel: 'Delete All',
-            variant: 'danger'
+            variant: 'danger',
+            width: '70%'
         });
         if (!confirmed) return;
 
@@ -1067,7 +1104,16 @@
             icon.style.animation = 'spin 0.8s linear infinite';
         }
 
-        // Collect filter values from the form
+        // 1. Trigger server-side refresh of all vCenters
+        fetch('/api/vcenters/refresh-all', { method: 'POST' })
+            .then(() => {
+                showToast("Background refresh initiated for all vCenters.", "info");
+            })
+            .catch(err => {
+                console.error("Failed to trigger background refresh:", err);
+            });
+
+        // 2. Refresh the UI list from current cache immediately
         const form = document.getElementById('snap-filters');
         const todayOnly = form ? form.querySelector('[name="today_only"]')?.checked : false;
         const url = `/api/inventory/snapshots?today_only=${todayOnly ? 'true' : ''}`;

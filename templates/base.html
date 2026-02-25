@@ -142,11 +142,12 @@
         let _confirmResolve = null;
 
         /**
-         * showConfirm({ title, message, confirmLabel, variant })
+         * showConfirm({ title, message, confirmLabel, variant, width })
          * variant: 'danger' (default) | 'warning' | 'info'
+         * width: CSS width (e.g. '70%')
          * Returns a Promise<boolean>
          */
-        function showConfirm({ title = 'Are you sure?', message = '', confirmLabel = 'Confirm', variant = 'danger' } = {}) {
+        function showConfirm({ title = 'Are you sure?', message = '', confirmLabel = 'OK', variant = 'danger', width } = {}) {
             return new Promise(resolve => {
                 const modal = document.getElementById('confirm-modal');
                 const iconWrap = document.getElementById('confirm-icon-wrap');
@@ -169,7 +170,15 @@
                 okBtn.innerHTML = `<i data-lucide="check" size="14"></i> ${confirmLabel}`;
 
                 titleEl.textContent = title;
-                msgEl.textContent = message;
+                msgEl.innerHTML = message;
+
+                // Support custom width for large tables or complex dialogs
+                const contentEl = modal.querySelector('div');
+                if (width) {
+                    contentEl.style.width = width;
+                } else {
+                    contentEl.style.width = '400px'; // default
+                }
 
                 if (window.lucide) lucide.createIcons();
 

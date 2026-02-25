@@ -26,7 +26,9 @@
             hx-trigger="click" onclick="syncVmSelection('{{ snap.vcenter_id }}', '{{ snap.vm_id }}')">
             <td style="text-align: center;" onclick="event.stopPropagation()">
                 <input type="checkbox" class="snapshot-checkbox" value="{{ snap.name }}" data-vm-id="{{ snap.vm_id }}"
-                    data-vcenter-id="{{ snap.vcenter_id }}" onchange="updateSnapshotDeleteState()">
+                    data-vcenter-id="{{ snap.vcenter_id }}" data-vm-name="{{ snap.vm_name }}"
+                    data-created="{{ snap.created.replace('T', ' ').split('.')[0] }}"
+                    data-description="{{ snap.description or '--' }}" onchange="updateSnapshotDeleteState()">
             </td>
             <td style="font-weight: 600; color: var(--text-main);">{{ snap.vm_name }}</td>
             <td style="font-size: 0.75rem; color: var(--text-dim);">{{ snap.vcenter_name }}</td>
