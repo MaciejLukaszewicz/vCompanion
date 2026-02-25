@@ -805,7 +805,7 @@ async def get_vcenters_partial(request: Request):
     if not hasattr(request.app.state, 'vcenter_manager'):
         return HTMLResponse("<p>Manager not ready</p>")
         
-    vcenter_statuses = request.app.state.vcenter_manager.cache.get_vcenter_status()
+    vcenter_statuses = request.app.state.vcenter_manager.get_connection_status()
     
     # Sort by name
     vcenter_statuses.sort(key=lambda x: x.get('name', '').lower())

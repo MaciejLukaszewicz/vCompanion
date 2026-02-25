@@ -13,8 +13,20 @@
         <tr class="vcenter-row">
             <td style="font-weight: 600; color: var(--text-main);">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span
-                        class="status-indicator {{ 'status-ready' if vc.status == 'READY' else 'status-error' }}"></span>
+                    {% if vc.connected %}
+                    <span class="status-indicator status-ready" title="vCenter connected and active"></span>
+                    {% else %}
+                    {% if vc.error_type == 'auth' %}
+                    <i data-lucide="shield-alert" style="color: var(--danger); width: 14px; height: 14px;"
+                        title="Authentication error - click to try logging in again"></i>
+                    {% elif vc.error_type in ['network', 'timeout', 'ssl'] %}
+                    <i data-lucide="wifi-off" style="color: var(--danger); width: 14px; height: 14px;"
+                        title="Network connection error - check connectivity"></i>
+                    {% else %}
+                    <i data-lucide="alert-triangle" style="color: var(--danger); width: 14px; height: 14px;"
+                        title="Connection error: {{ vc.error_type or 'Unknown' }}"></i>
+                    {% endif %}
+                    {% endif %}
                     {{ vc.name }}
                 </div>
             </td>

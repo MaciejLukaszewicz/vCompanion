@@ -162,13 +162,23 @@ class VCenterManager:
                     seconds_since = (datetime.now() - lr_dt).total_seconds()
                 except: pass
 
-            status.append({
+            # Prepare status object with base fields
+            vc_status = {
                 "id": vc_id, "name": conn.config.name, "host": conn.config.host,
-                "connected": conn.is_alive(), "refresh_status": cs.get('status', 'READY'),
+                "connected": conn.is_alive(), 
+                "refresh_status": cs.get('status', 'READY'),
+                "error_type": conn.last_error_type if not conn.is_alive() else None,
                 "seconds_since": seconds_since,
                 "seconds_until": max(0, int((conn.config.refresh_interval or self.global_refresh_interval) - (now - last_t))) if last_t > 0 else 0,
                 "unlocked": self.cache.is_unlocked()
-            })
+            }
+            
+            # Merge fields from cache (version, build, last_refresh, ssh_enabled, etc.)
+            for k, v in cs.items():
+                if k not in vc_status:
+                    vc_status[k] = v
+            
+            status.append(vc_status)
         return status
 
     def get_stats(self):
@@ -287,6 +297,7 @@ class VCenterConnection:
         self.content = None
         self.appliance_token = None
         self.last_appliance_error = None
+        self.last_error_type = None  # Added to track vCenter connection error type
 
     def is_alive(self):
         if not self.si: return False
@@ -468,37 +479,46 @@ class VCenterConnection:
             self.si = SmartConnect(host=self.config.host, user=user, pwd=password, port=self.config.port, sslContext=ctx)
             self.content = self.si.RetrieveContent()
             logger.info(f"[{self.config.name}] Successfully connected")
+            self.last_error_type = None
             return (True, None, None)
         except vim.fault.InvalidLogin as e:
             # Wrong username or password
             logger.warning(f"[{self.config.name}] Authentication failed: Invalid credentials")
+            self.last_error_type = 'auth'
             return (False, 'auth', 'Invalid username or password')
         except (ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError) as e:
             # Connection refused - vCenter might be down or unreachable
             logger.error(f"[{self.config.name}] Connection refused: {str(e)}")
+            self.last_error_type = 'network'
             return (False, 'network', f'Connection refused - vCenter may be down or unreachable')
         except (TimeoutError, socket.timeout) as e:
             # Timeout - network issue or VPN disconnected
             logger.error(f"[{self.config.name}] Connection timeout: {str(e)}")
+            self.last_error_type = 'timeout'
             return (False, 'timeout', 'Connection timeout - check network connectivity or VPN')
         except ssl.SSLError as e:
             # SSL certificate error
             logger.error(f"[{self.config.name}] SSL error: {str(e)}")
+            self.last_error_type = 'ssl'
             return (False, 'ssl', f'SSL certificate error: {str(e)}')
         except OSError as e:
             # Generic network errors (DNS, unreachable host, etc.)
             if 'timed out' in str(e).lower():
                 logger.error(f"[{self.config.name}] Network timeout: {str(e)}")
+                self.last_error_type = 'timeout'
                 return (False, 'timeout', 'Network timeout - check VPN or network connectivity')
             elif 'no route to host' in str(e).lower() or 'unreachable' in str(e).lower():
                 logger.error(f"[{self.config.name}] Host unreachable: {str(e)}")
+                self.last_error_type = 'network'
                 return (False, 'network', 'Host unreachable - check network or VPN connection')
             else:
                 logger.error(f"[{self.config.name}] Network error: {str(e)}")
+                self.last_error_type = 'network'
                 return (False, 'network', f'Network error: {str(e)}')
         except Exception as e:
             # Catch-all for unexpected errors
             logger.error(f"[{self.config.name}] Unexpected error during connection: {str(e)}")
+            self.last_error_type = 'unknown'
             return (False, 'unknown', f'Unexpected error: {str(e)}')
 
     def disconnect(self):
