@@ -11,6 +11,132 @@
     </div>
 </header>
 
+<!-- Take Snapshot Modal -->
+<div id="take-snapshot-modal"
+    style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 9000; align-items: center; justify-content: center;">
+    <div
+        style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; width: 420px; max-width: 95vw; box-shadow: 0 25px 60px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <i data-lucide="camera" size="18" style="color: var(--primary);"></i>
+                <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">Take Snapshot</h3>
+            </div>
+            <button onclick="closeTakeSnapshotModal()"
+                style="background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0.25rem;">
+                <i data-lucide="x" size="18"></i>
+            </button>
+        </div>
+
+        <p id="take-snap-vm-label"
+            style="font-size: 0.8rem; color: var(--text-dim); margin: 0 0 1.25rem 0; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.04); border-radius: 4px;">
+        </p>
+
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Snapshot
+                Name <span style="color: var(--danger);">*</span></label>
+            <input type="text" id="take-snap-name" placeholder="e.g. Before patch 2025-02"
+                style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; box-sizing: border-box;">
+        </div>
+
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Comment
+                (optional)</label>
+            <textarea id="take-snap-desc" rows="3" placeholder="Short description of why this snapshot was taken…"
+                style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; resize: vertical; box-sizing: border-box;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+            <button type="button" onclick="closeTakeSnapshotModal()"
+                style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); cursor: pointer; font-size: 0.875rem;">
+                Cancel
+            </button>
+            <button type="button" id="take-snap-submit-btn" onclick="submitTakeSnapshot()"
+                style="padding: 0.5rem 1.25rem; background: var(--primary); border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="camera" size="14"></i> Take Snapshot
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Snapshot Modal -->
+<div id="batch-snapshot-modal"
+    style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 9005; align-items: center; justify-content: center;">
+    <div
+        style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; width: 600px; max-width: 95vw; box-shadow: 0 25px 60px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <i data-lucide="layers" size="18" style="color: var(--primary);"></i>
+                <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">Batch Take Snapshots</h3>
+            </div>
+            <button onclick="closeBatchSnapshotModal()" id="batch-snap-close-x"
+                style="background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0.25rem;">
+                <i data-lucide="x" size="18"></i>
+            </button>
+        </div>
+
+        <div id="batch-snap-input-view">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label
+                        style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Snapshot
+                        Name <span style="color: var(--danger);">*</span></label>
+                    <input type="text" id="batch-snap-name" placeholder="e.g. Patching Window" autocomplete="off"
+                        style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; box-sizing: border-box;">
+                </div>
+                <div>
+                    <label
+                        style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Comment
+                        (optional)</label>
+                    <input type="text" id="batch-snap-desc" placeholder="e.g. Critical security updates"
+                        autocomplete="off"
+                        style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; box-sizing: border-box;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label
+                    style="display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.35rem;">Virtual
+                    Machines List (one per line) <span style="color: var(--danger);">*</span></label>
+                <textarea id="batch-snap-vmlist" rows="8" placeholder="VM-NAME-01&#10;VM-NAME-02&#10;..."
+                    style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); font-size: 0.875rem; outline: none; resize: none; font-family: monospace; box-sizing: border-box;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                <button type="button" onclick="closeBatchSnapshotModal()"
+                    style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); cursor: pointer; font-size: 0.875rem;">
+                    Cancel
+                </button>
+                <button type="button" id="batch-snap-submit-btn" onclick="submitBatchSnapshots()"
+                    style="padding: 0.5rem 1.25rem; background: var(--primary); border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="play" size="14"></i> Start Batch Process
+                </button>
+            </div>
+        </div>
+
+        <div id="batch-snap-progress-view" style="display: none;">
+            <div
+                style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(var(--primary-rgb), 0.1); border-radius: 6px; border: 1px dashed var(--primary);">
+                <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary);" id="batch-snap-current-status">
+                    Initializing...</div>
+                <div style="font-size: 0.75rem; color: var(--text-dim);" id="batch-snap-overall-progress">Objects: 0 / 0
+                </div>
+            </div>
+
+            <div id="batch-snap-results-list"
+                style="max-height: 300px; overflow-y: auto; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem;">
+                <!-- Result lines injected here -->
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+                <button type="button" id="batch-snap-finish-btn" onclick="closeBatchSnapshotModal()" disabled
+                    style="padding: 0.5rem 1.25rem; background: var(--border); border: none; border-radius: 6px; color: var(--text-dim); cursor: not-allowed; font-size: 0.875rem;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="inventory-container" style="display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1rem;">
     <!-- VMs Section -->
     <section class="table-container" id="vms-section">
@@ -108,22 +234,23 @@
     <!-- Global Snapshots Section -->
     <section class="table-container" id="snapshots-section" style="margin-bottom: 1rem;">
         <div
-            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
-            <div style="display: flex; align-items: center; gap: 1.5rem;">
-                <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;"
+            style="padding: 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); flex-wrap: wrap; gap: 0.75rem;">
+
+            <!-- LEFT: title + today filter (inside HTMX form) -->
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <h2 style="font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none; margin: 0;"
                     onclick="toggleInventorySection('snapshots-content', 'snapshots-toggle-icon')">
                     <i data-lucide="camera" size="18" style="color: var(--accent);"></i> Global Snapshots
                     <span id="snap-count-badge" class="badge-accent" style="margin-left: 0.5rem;">{{ snap_count or 0
                         }}</span>
                 </h2>
 
-                <!-- Snapshot Filters -->
-                <form id="snap-filters" style="display: flex; align-items: center; gap: 1rem;"
+                <form id="snap-filters" style="display: flex; align-items: center; gap: 0.75rem;"
                     hx-get="/api/inventory/snapshots" hx-target="#snapshots-list-target" hx-trigger="change">
-                    <label
-                        style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;">
+                    <div style="width: 1px; height: 24px; background: var(--border);"></div>
+                    <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; user-select: none;">
                         <div class="switch">
-                            <input type="checkbox" name="today_only" value="true" hx-trigger="change">
+                            <input type="checkbox" name="today_only" value="true">
                             <span class="slider"></span>
                         </div>
                         <span style="font-size: 0.85rem; color: var(--text-dim);">Taken today</span>
@@ -131,7 +258,51 @@
                 </form>
             </div>
 
+            <!-- CENTER: search + delete (OUTSIDE the HTMX form to avoid triggering reload on change) -->
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <!-- Search/Filter -->
+                <div style="position: relative; display: flex; align-items: center;">
+                    <i data-lucide="search" size="14"
+                        style="position: absolute; left: 0.5rem; color: var(--text-dim); pointer-events: none; z-index: 1;"></i>
+                    <input type="text" id="snap-search-input" oninput="filterSnapshots(this.value)"
+                        placeholder="Filter by VM, name, description…"
+                        style="padding: 0.35rem 2rem 0.35rem 1.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 4px; color: var(--text-main); font-size: 0.8rem; width: 280px; outline: none;">
+                    <button type="button" id="snap-search-clear" onclick="clearSnapSearch()"
+                        style="position: absolute; right: 0.4rem; background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0; display: none; align-items: center; justify-content: center;"
+                        title="Clear search">
+                        <i data-lucide="x" size="14"></i>
+                    </button>
+                </div>
+
+                <div style="width: 1px; height: 24px; background: var(--border);"></div>
+
+                <!-- Privileged Delete Action -->
+                <div
+                    style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.15); padding: 0.3rem 0.6rem; border-radius: 6px; display: flex; align-items: center; gap: 0.75rem;">
+                    <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}" size="14"
+                        style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }}; opacity: 0.8;"
+                        title="{{ 'Elevated Privileges Unlocked' if elevated_unlocked else 'Elevated Privileges Locked - go to Settings to unlock' }}"></i>
+                    <button type="button" class="btn-primary" id="btn-batch-snap"
+                        title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Take batch snapshots for multiple VMs{% endif %}"
+                        style="{% if not elevated_unlocked %}opacity: 0.5; cursor: not-allowed;{% endif %} display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: var(--primary); border: none; color: white; border-radius: 4px; font-size: 0.85rem;"
+                        {% if not elevated_unlocked %}disabled{% endif %} onclick="openBatchSnapshotModal()">
+                        <i data-lucide="layers" size="14"></i> Batch Snapshots
+                    </button>
+                    <button type="button" class="btn-primary" id="btn-delete-selected-snaps"
+                        title="{% if not elevated_unlocked %}Requires elevated privileges{% else %}Delete selected snapshots{% endif %}"
+                        style="{% if not elevated_unlocked %}opacity: 0.5; cursor: not-allowed;{% endif %} display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: var(--danger); border: none; color: white; border-radius: 4px; font-size: 0.85rem;"
+                        {% if not elevated_unlocked %}disabled{% endif %} onclick="deleteSelectedGlobalSnapshots()">
+                        <i data-lucide="trash-2" size="14"></i> Delete Selected
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT: action icons -->
             <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="header-action-icon" id="btn-refresh-snapshots" onclick="refreshSnapshots()"
+                    title="Refresh snapshots list">
+                    <i data-lucide="refresh-cw" size="18" id="refresh-snap-icon"></i>
+                </div>
                 <div class="header-action-icon" onclick="exportToCSV('snapshots')"
                     title="Export filtered snapshots to CSV">
                     <i data-lucide="download" size="18"></i>
@@ -142,8 +313,10 @@
                 </div>
             </div>
         </div>
+
         <div id="snapshots-content" style="display: none; height: 400px; overflow-y: auto;"
-            hx-get="/api/inventory/snapshots" hx-trigger="load" hx-target="#snapshots-list-target">
+            hx-get="/api/inventory/snapshots" hx-trigger="load, vcenter-refreshed from:body"
+            hx-target="#snapshots-list-target" hx-include="#snap-filters">
             <div id="snapshots-list-target">
                 <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
                     <div class="spinner-small" style="margin-bottom: 1rem;"></div>
@@ -396,6 +569,10 @@
         margin: 0 auto;
     }
 
+    .refresh-spinner.htmx-request {
+        animation: spin 1s linear infinite;
+    }
+
     /* Pane Toggle Button Style */
     .pane-toggle-btn {
         width: 32px;
@@ -645,10 +822,556 @@
         }
     }
 
+    // Snapshot Deletion Logic
+    let activeTaskCount = 0;
+
+    function filterSnapshots(query) {
+        const q = query.trim().toLowerCase();
+        const rows = document.querySelectorAll('#snapshots-list-target .inventory-list-table tbody tr');
+        rows.forEach(row => {
+            const searchText = row.getAttribute('data-search') || '';
+            const match = !q || searchText.includes(q);
+            row.style.display = match ? '' : 'none';
+        });
+
+        // Show/hide the X clear button
+        const clearBtn = document.getElementById('snap-search-clear');
+        if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+
+        // Reset the select-all checkbox
+        const selectAll = document.getElementById('selectAllSnapshots');
+        if (selectAll) {
+            selectAll.indeterminate = false;
+            selectAll.checked = false;
+        }
+        updateSnapshotDeleteState();
+    }
+
+    function clearSnapSearch() {
+        const input = document.getElementById('snap-search-input');
+        if (input) {
+            input.value = '';
+            filterSnapshots('');
+            input.focus();
+        }
+    }
+
+    function refreshInventoryPanels() {
+        // Refresh snapshots table
+        const snapFilters = document.getElementById('snap-filters');
+        if (snapFilters) htmx.trigger(snapFilters, 'change');
+
+        // Refresh details pane if a VM is selected
+        const selectedVmId = document.getElementById('selected-vm-id')?.value;
+        const selectedVcId = document.getElementById('selected-vcenter-id')?.value;
+
+        if (selectedVmId && selectedVcId) {
+            const url = `/api/inventory/vm-details/${selectedVcId}/${selectedVmId}`;
+            const detailsPanel = document.getElementById('vm-details-panel');
+            if (detailsPanel) {
+                htmx.ajax('GET', url, { target: '#vm-details-panel', select: '#vm-details-panel' });
+            }
+        }
+    }
+
+    function updateSnapshotIconsState(vcenterId, vmId, snapshotName, isDeleting) {
+        // Find all buttons that match this snapshot in both panels
+        const selector = `button[onclick*="'${vcenterId}'"][onclick*="'${vmId}'"][onclick*="'${snapshotName}'"]`;
+        const buttons = document.querySelectorAll(selector);
+        buttons.forEach(btn => {
+            if (isDeleting) {
+                btn.innerHTML = '<div class="spinner-small" style="width: 14px; height: 14px; border-width: 1px;"></div>';
+                btn.disabled = true;
+                btn.classList.add('is-deleting');
+            } else {
+                btn.innerHTML = '<i data-lucide="trash-2" size="16"></i>';
+                btn.disabled = false;
+                btn.classList.remove('is-deleting');
+                if (window.lucide) lucide.createIcons();
+            }
+        });
+    }
+
+    async function monitorTask(vcenterId, taskId, snapshotName, vmId) {
+        activeTaskCount++;
+        const interval = setInterval(async () => {
+            try {
+                const r = await fetch(`/api/inventory/tasks/${vcenterId}/${taskId}`);
+                const data = await r.json();
+                if (data.success) {
+                    const status = data.status;
+                    // states: 'queued', 'running', 'success', 'error'
+                    if (status.state === 'success' || status.state === 'error') {
+                        clearInterval(interval);
+                        activeTaskCount--;
+
+                        if (status.state === 'success') {
+                            showToast(`Snapshot '${snapshotName}' deleted successfully.`, 'success');
+                            // Trigger a targeted refresh for this vCenter after success
+                            fetch(`/api/vcenters/refresh/${vcenterId}`, { method: 'POST' });
+                        } else {
+                            showToast(`Error deleting '${snapshotName}': ${status.error}`, 'error');
+                            // Restore icons only on error
+                            updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
+                        }
+
+                        if (activeTaskCount === 0) {
+                            setTimeout(refreshInventoryPanels, 1000);
+                        }
+                    }
+                } else {
+                    // API failure - stop monitoring to avoid infinite loop
+                    clearInterval(interval);
+                    activeTaskCount--;
+                    updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
+                }
+            } catch (e) {
+                console.error("Task check failed:", e);
+                clearInterval(interval);
+                activeTaskCount--;
+                updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
+            }
+        }, 5000);
+    }
+
+    function toggleAllSnapshots(source) {
+        // Only operate on currently VISIBLE rows
+        const rows = document.querySelectorAll('#snapshots-list-target .inventory-list-table tbody tr');
+        rows.forEach(row => {
+            if (row.style.display !== 'none') {
+                const cb = row.querySelector('.snapshot-checkbox');
+                if (cb) cb.checked = source.checked;
+            }
+        });
+        updateSnapshotDeleteState();
+    }
+
+    function updateSnapshotDeleteState() {
+        const checkboxes = document.querySelectorAll('.snapshot-checkbox:checked');
+        const count = checkboxes.length;
+        const btnTitle = document.getElementById('btn-delete-selected-snaps');
+        if (btnTitle) {
+            btnTitle.innerHTML = `<i data-lucide="trash-2" size="14"></i> Delete Selected (${count})`;
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+
+    async function deleteSnapshot(vcenterId, vmId, snapshotName, btnElem) {
+        const confirmed = await showConfirm({
+            title: 'Delete Snapshot',
+            message: `Are you sure you want to delete snapshot '${snapshotName}'? This action cannot be undone.`,
+            confirmLabel: 'Delete',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        updateSnapshotIconsState(vcenterId, vmId, snapshotName, true);
+
+        try {
+            const res = await fetch('/api/inventory/snapshots/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    vcenter_id: vcenterId,
+                    vm_id: vmId,
+                    snapshot_name: snapshotName
+                })
+            });
+
+            const data = await res.json();
+            if (data.success && data.task_id) {
+                showToast(`Snapshot '${snapshotName}' deletion initiated.`, 'info');
+                monitorTask(vcenterId, data.task_id, snapshotName, vmId);
+            } else {
+                showToast(data.error || 'Failed to delete snapshot', 'error');
+                updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
+            }
+        } catch (error) {
+            console.error('Error deleting snapshot:', error);
+            showToast('Network error while deleting snapshot.', 'error');
+            updateSnapshotIconsState(vcenterId, vmId, snapshotName, false);
+        }
+    }
+
+    async function deleteSelectedGlobalSnapshots() {
+        const checkboxes = document.querySelectorAll('.snapshot-checkbox:checked');
+        const count = checkboxes.length;
+        if (count === 0) {
+            showToast('No snapshots selected.', 'warning');
+            return;
+        }
+
+        let snapshotRows = '';
+        checkboxes.forEach(cb => {
+            const vmName = cb.getAttribute('data-vm-name') || 'Unknown';
+            const snapName = cb.value;
+            const created = cb.getAttribute('data-created') || '--';
+            const desc = cb.getAttribute('data-description') || '--';
+
+            snapshotRows += `
+                <tr>
+                    <td style="padding: 0.5rem; border-bottom: 1px solid var(--border);">${vmName}</td>
+                    <td style="padding: 0.5rem; border-bottom: 1px solid var(--border); color: var(--primary);">${snapName}</td>
+                    <td style="padding: 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.75rem;">${created}</td>
+                    <td style="padding: 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--text-dim);">${desc}</td>
+                </tr>
+            `;
+        });
+
+        const tableHtml = `
+            <div style="margin-top: 1rem; max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+                    <thead style="background: var(--surface); position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th style="padding: 0.6rem 0.5rem; border-bottom: 2px solid var(--border);">VM</th>
+                            <th style="padding: 0.6rem 0.5rem; border-bottom: 2px solid var(--border);">Snapshot</th>
+                            <th style="padding: 0.6rem 0.5rem; border-bottom: 2px solid var(--border);">Created</th>
+                            <th style="padding: 0.6rem 0.5rem; border-bottom: 2px solid var(--border);">Desc</th>
+                        </tr>
+                    </thead>
+                    <tbody>${snapshotRows}</tbody>
+                </table>
+            </div>
+        `;
+
+        const confirmed = await showConfirm({
+            title: 'Delete Selected Snapshots',
+            message: `Are you sure you want to delete <b>${count}</b> selected snapshot(s)? This action cannot be undone.${tableHtml}`,
+            confirmLabel: 'Delete All',
+            variant: 'danger',
+            width: '70%'
+        });
+        if (!confirmed) return;
+
+        const btnTitle = document.getElementById('btn-delete-selected-snaps');
+        const originalText = btnTitle.innerHTML;
+        btnTitle.innerHTML = '<div class="spinner-small" style="width: 14px; height: 14px; border-width: 1px;"></div> Deleting...';
+        btnTitle.disabled = true;
+
+        const snapshotsToProcess = [];
+        checkboxes.forEach(cb => {
+            snapshotsToProcess.push({
+                vcenter_id: cb.getAttribute('data-vcenter-id'),
+                vm_id: cb.getAttribute('data-vm-id'),
+                snapshot_name: cb.value
+            });
+        });
+
+        try {
+            const res = await fetch('/api/inventory/snapshots/delete-bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ snapshots: snapshotsToProcess })
+            });
+
+            const data = await res.json();
+            if (data.success && data.results) {
+                let startedCount = 0;
+                data.results.forEach(resItem => {
+                    if (resItem.success && resItem.task_id) {
+                        startedCount++;
+                        updateSnapshotIconsState(resItem.vcenter_id, resItem.vm_id, resItem.snapshot_name, true);
+                        monitorTask(resItem.vcenter_id, resItem.task_id, resItem.snapshot_name, resItem.vm_id);
+                    } else {
+                        showToast(`Failed to initiate deletion for '${resItem.snapshot_name}'`, 'warning');
+                    }
+                });
+                if (startedCount > 0) {
+                    showToast(`Successfully initiated deletion of ${startedCount} snapshots.`, 'info');
+                }
+            } else {
+                showToast(data.error || 'Failed to delete selected snapshots', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting snapshots in bulk:', error);
+            showToast('Network error while deleting snapshots.', 'error');
+        } finally {
+            btnTitle.innerHTML = originalText;
+            btnTitle.disabled = false;
+            if (window.lucide) lucide.createIcons();
+            // Clear selections
+            const selectAllCheck = document.getElementById('selectAllSnapshots');
+            if (selectAllCheck) {
+                selectAllCheck.checked = false;
+                toggleAllSnapshots(selectAllCheck);
+            }
+        }
+    }
+
+    function refreshSnapshots() {
+        const icon = document.getElementById('refresh-snap-icon');
+        if (icon) {
+            icon.style.animation = 'spin 0.8s linear infinite';
+        }
+
+        // 1. Trigger server-side refresh of all vCenters
+        fetch('/api/vcenters/refresh-all', { method: 'POST' })
+            .then(() => {
+                showToast("Background refresh initiated for all vCenters.", "info");
+            })
+            .catch(err => {
+                console.error("Failed to trigger background refresh:", err);
+            });
+
+        // 2. Refresh the UI list from current cache immediately
+        const form = document.getElementById('snap-filters');
+        const todayOnly = form ? form.querySelector('[name="today_only"]')?.checked : false;
+        const url = `/api/inventory/snapshots?today_only=${todayOnly ? 'true' : ''}`;
+
+        htmx.ajax('GET', url, {
+            target: '#snapshots-list-target',
+            swap: 'innerHTML'
+        }).then(() => {
+            if (icon) icon.style.animation = '';
+            if (window.lucide) lucide.createIcons();
+        }).catch(() => {
+            if (icon) icon.style.animation = '';
+        });
+    }
+
+    // --- Batch Snapshot Logic ---
+    async function openBatchSnapshotModal() {
+        document.getElementById('batch-snapshot-modal').style.display = 'flex';
+        document.getElementById('batch-snap-input-view').style.display = 'block';
+        document.getElementById('batch-snap-progress-view').style.display = 'none';
+        document.getElementById('batch-snap-name').value = '';
+        document.getElementById('batch-snap-desc').value = '';
+        document.getElementById('batch-snap-vmlist').value = '';
+        document.getElementById('batch-snap-finish-btn').disabled = true;
+        document.getElementById('batch-snap-finish-btn').style.background = 'var(--border)';
+        document.getElementById('batch-snap-finish-btn').style.cursor = 'not-allowed';
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function closeBatchSnapshotModal() {
+        document.getElementById('batch-snapshot-modal').style.display = 'none';
+    }
+
+    async function submitBatchSnapshots() {
+        const name = document.getElementById('batch-snap-name').value.trim();
+        const desc = document.getElementById('batch-snap-desc').value.trim();
+        const vmlistText = document.getElementById('batch-snap-vmlist').value.trim();
+
+        if (!name || !vmlistText) {
+            showToast('Name and VM list are required.', 'warning');
+            return;
+        }
+
+        const vmnames = vmlistText.split('\n').map(v => v.trim()).filter(v => v !== '');
+        if (vmnames.length === 0) {
+            showToast('No valid VM names provided.', 'warning');
+            return;
+        }
+
+        // Confirm start
+        const confirmed = await showConfirm({
+            title: 'Batch Snapshot Process',
+            message: `You are about to process ${vmnames.length} virtual machine(s). This process will run sequentially. Proceed?`,
+            confirmLabel: 'Start Process',
+            variant: 'info'
+        });
+        if (!confirmed) return;
+
+        // Switch to progress view
+        document.getElementById('batch-snap-input-view').style.display = 'none';
+        document.getElementById('batch-snap-progress-view').style.display = 'block';
+        document.getElementById('batch-snap-close-x').style.display = 'none'; // Lock dialog during process
+
+        const resultsList = document.getElementById('batch-snap-results-list');
+        resultsList.innerHTML = '';
+
+        const rows = [];
+        vmnames.forEach((vmname) => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.style.padding = '0.55rem 0.75rem';
+            row.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            row.style.fontSize = '0.85rem';
+            row.innerHTML = `
+                <span style="font-family: monospace; color: var(--text-main);">${vmname}</span>
+                <span class="batch-status" style="color: var(--text-dim); display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="clock" size="14"></i> In queue</span>
+            `;
+            resultsList.appendChild(row);
+            rows.push(row);
+        });
+        if (window.lucide) lucide.createIcons();
+
+        // Sequential processing
+        for (let i = 0; i < vmnames.length; i++) {
+            const vmname = vmnames[i];
+            const row = rows[i];
+            const statusLabel = row.querySelector('.batch-status');
+
+            document.getElementById('batch-snap-current-status').innerText = `Current Task: Creating snapshot for "${vmname}"...`;
+            document.getElementById('batch-snap-overall-progress').innerText = `Batch Progress: ${i + 1} / ${vmnames.length}`;
+            statusLabel.innerHTML = `<span style="color: var(--primary); display: flex; align-items: center; gap: 0.5rem;"><div class="spinner-small" style="width:12px; height:12px; border-width:1px;"></div> Working...</span>`;
+
+            try {
+                // 1. Lookup VM
+                const lookupRes = await fetch(`/api/inventory/lookup-vm/${encodeURIComponent(vmname)}`);
+                if (!lookupRes.ok) throw new Error('VM not found in inventory');
+                const vmInfo = await lookupRes.json();
+
+                // 2. Create Snapshot
+                const createRes = await fetch('/api/inventory/snapshots/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        vcenter_id: vmInfo.vcenter_id,
+                        vm_id: vmInfo.vm_id,
+                        snapshot_name: name,
+                        snapshot_description: desc
+                    })
+                });
+                const createData = await createRes.json();
+                if (!createData.task_id) throw new Error(createData.error || 'Snap creation rejected by vCenter');
+
+                // 3. Monitor Task
+                const taskId = createData.task_id;
+                const vcId = vmInfo.vcenter_id;
+                let finished = false;
+
+                while (!finished) {
+                    await new Promise(r => setTimeout(r, 4000));
+                    const taskRes = await fetch(`/api/inventory/tasks/${vcId}/${taskId}`);
+                    const taskData = await taskRes.json();
+                    if (taskData.success) {
+                        if (taskData.status.state === 'success') {
+                            finished = true;
+                        } else if (taskData.status.state === 'error') {
+                            throw new Error(taskData.status.error || 'vCenter task failed');
+                        }
+                    } else {
+                        throw new Error('Task monitoring connection lost');
+                    }
+                }
+
+                // 4. Verify Snapshot presence
+                let verified = false;
+                for (let retry = 0; retry < 6; retry++) {
+                    // Refresh is triggered by create_snapshot in background, but might take time
+                    const verifyRes = await fetch(`/api/inventory/verify-snapshot/${vcId}/${vmInfo.vm_id}/${encodeURIComponent(name)}`);
+                    const verifyData = await verifyRes.json();
+                    if (verifyData.found) {
+                        verified = true;
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 3000));
+                }
+
+                if (verified) {
+                    statusLabel.innerHTML = `<span style="color: var(--success); display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="check-circle" size="14"></i> Created</span>`;
+                } else {
+                    statusLabel.innerHTML = `<span style="color: var(--warning); display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="help-circle" size="14"></i> Unverified</span>`;
+                }
+
+            } catch (err) {
+                console.error(`Batch error for ${vmname}:`, err);
+                statusLabel.innerHTML = `<span style="color: var(--danger); display: flex; align-items: center; gap: 0.5rem;" title="${err.message}"><i data-lucide="alert-circle" size="14"></i> Failed</span>`;
+            }
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Finalize
+        document.getElementById('batch-snap-current-status').innerText = `Batch Process Completed`;
+        document.getElementById('batch-snap-close-x').style.display = 'block';
+
+        const finishBtn = document.getElementById('batch-snap-finish-btn');
+        finishBtn.disabled = false;
+        finishBtn.style.background = 'var(--primary)';
+        finishBtn.style.color = 'white';
+        finishBtn.style.cursor = 'pointer';
+
+        refreshInventoryPanels();
+    }
+
     // Initialize on load
     document.addEventListener('DOMContentLoaded', () => {
         window.isSearchFocused = false;
         initInventoryResizers();
+    });
+
+    // --- Take Snapshot Modal ---
+    let _snapModalVcId = null;
+    let _snapModalVmId = null;
+
+    function openTakeSnapshotModal(vcenterId, vmId, vmName) {
+        _snapModalVcId = vcenterId;
+        _snapModalVmId = vmId;
+
+        document.getElementById('take-snap-vm-label').textContent = `VM: ${vmName}`;
+        document.getElementById('take-snap-name').value = '';
+        document.getElementById('take-snap-desc').value = '';
+
+        const modal = document.getElementById('take-snapshot-modal');
+        modal.style.display = 'flex';
+        if (window.lucide) lucide.createIcons();
+        setTimeout(() => document.getElementById('take-snap-name').focus(), 50);
+    }
+
+    function closeTakeSnapshotModal() {
+        document.getElementById('take-snapshot-modal').style.display = 'none';
+        _snapModalVcId = null;
+        _snapModalVmId = null;
+    }
+
+    async function submitTakeSnapshot() {
+        const name = document.getElementById('take-snap-name').value.trim();
+        const desc = document.getElementById('take-snap-desc').value.trim();
+
+        if (!name) {
+            document.getElementById('take-snap-name').style.borderColor = 'var(--danger)';
+            document.getElementById('take-snap-name').focus();
+            return;
+        }
+        document.getElementById('take-snap-name').style.borderColor = '';
+
+        const btn = document.getElementById('take-snap-submit-btn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<div class="spinner-small" style="width: 14px; height: 14px; border-width: 1px;"></div> Creating...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/inventory/snapshots/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    vcenter_id: _snapModalVcId,
+                    vm_id: _snapModalVmId,
+                    snapshot_name: name,
+                    snapshot_description: desc
+                })
+            });
+
+            const data = await res.json();
+            if (data.success && data.task_id) {
+                const vcId = _snapModalVcId;
+                const vmId = _snapModalVmId;
+                closeTakeSnapshotModal();
+                showToast(`Snapshot '${name}' creation initiated.`, 'info');
+                monitorTask(vcId, data.task_id, name, vmId);
+            } else {
+                showToast(data.error || 'Failed to create snapshot', 'error');
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+                if (window.lucide) lucide.createIcons();
+            }
+        } catch (error) {
+            console.error('Error creating snapshot:', error);
+            showToast('Network error while creating snapshot.', 'error');
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+
+    // Close modal on ESC or backdrop click
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeTakeSnapshotModal();
+    });
+    document.getElementById('take-snapshot-modal').addEventListener('click', e => {
+        if (e.target === document.getElementById('take-snapshot-modal')) closeTakeSnapshotModal();
     });
 </script>
 {% endblock %}

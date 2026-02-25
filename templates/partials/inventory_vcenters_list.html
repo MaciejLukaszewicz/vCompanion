@@ -269,11 +269,12 @@
         if (cb.dataset.initialState === 'unknown') cb.indeterminate = true;
     });
 
-    let activeVcId = null;
+    // Initialize window-scoped activeVcId to avoid let redeclaration errors in HTMX
+    window.activeVcId = window.activeVcId || null;
 
     window.requestApplianceLogin = function (vcId, vcName) {
         try {
-            activeVcId = vcId;
+            window.activeVcId = vcId;
             const modal = document.getElementById('applianceLoginModal');
             if (!modal) {
                 console.error('Modal applianceLoginModal not found');
@@ -291,11 +292,11 @@
 
     window.closeApplianceModal = function () {
         document.getElementById('applianceLoginModal').style.display = 'none';
-        activeVcId = null;
+        window.activeVcId = null;
     }
 
     async function submitApplianceLogin() {
-        if (!activeVcId) return;
+        if (!window.activeVcId) return;
         const user = document.getElementById('appliance-user').value;
         const pass = document.getElementById('appliance-pass').value;
         const btn = document.getElementById('modal-submit-btn');
@@ -308,12 +309,12 @@
             const r = await fetch('/api/inventory/appliance-login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vcenter_id: activeVcId, username: user, password: pass })
+                body: JSON.stringify({ vcenter_id: window.activeVcId, username: user, password: pass })
             });
             const data = await r.json();
             if (data.success) {
                 if (window.showNotification) window.showNotification('REST API Connection established.', 'success');
-                const vcIdToUpdate = activeVcId;
+                const vcIdToUpdate = window.activeVcId;
                 closeApplianceModal();
                 updateSSHStatus(vcIdToUpdate);
             } else throw new Error(data.error || 'Login failed');

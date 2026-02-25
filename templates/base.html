@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -14,35 +14,47 @@
 </head>
 
 <body class="theme-{{ settings.app_settings.theme }} accent-{{ settings.app_settings.accent_color }}">
+    <script>
+        if (document.cookie.includes('sidebarCollapsed=true')) {
+            document.body.classList.add('sidebar-collapsed');
+        }
+    </script>
     <!-- Sidebar Navigation -->
-    <aside>
-        <div class="logo">
-            <i data-lucide="shield-check" style="stroke-width: 3px;"></i>
-            {{ settings.app_settings.title }}
+    <aside id="sidebar">
+        <script>
+            if (document.cookie.includes('sidebarCollapsed=true')) {
+                document.getElementById('sidebar').classList.add('collapsed');
+            }
+        </script>
+        <div class="sidebar-header">
+            <div class="logo">
+                <i data-lucide="shield-check" style="stroke-width: 3px;"></i>
+                <span class="logo-text">{{ settings.app_settings.title }}</span>
+            </div>
+            <div class="sidebar-actions">
+                <button id="sidebar-toggle" class="btn-sidebar-action" title="Toggle Sidebar">
+                    <i data-lucide="chevron-left"></i>
+                </button>
+            </div>
         </div>
-        <nav>
+        <nav hx-boost="true" hx-target="#page-content" hx-select="#page-content" hx-swap="outerHTML" hx-push-url="true">
             <ul>
-                <li><a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">
-                        <i data-lucide="layout-dashboard"></i> Dashboard
+                <li><a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}" title="Dashboard">
+                        <i data-lucide="layout-dashboard"></i>
+                        <span class="nav-text">Dashboard</span>
                     </a></li>
-                <li><a href="/inventory" class="{% if active_page == 'inventory' %}active{% endif %}">
-                        <i data-lucide="layers"></i> Inventory
+                <li><a href="/inventory" class="{% if active_page == 'inventory' %}active{% endif %}" title="Inventory">
+                        <i data-lucide="layers"></i>
+                        <span class="nav-text">Inventory</span>
                     </a></li>
-                <!-- Other menu items removed as per user request -->
-                <!-- <li><a href="/datastores" class="{% if active_page == 'datastores' %}active{% endif %}">
-                        <i data-lucide="database"></i> Datastores
+                <li><a href="/performance" class="{% if active_page == 'performance' %}active{% endif %}"
+                        title="Performance">
+                        <i data-lucide="activity"></i>
+                        <span class="nav-text">Performance</span>
                     </a></li>
-                <li><a href="/hosts" class="{% if active_page == 'hosts' %}active{% endif %}">
-                        <i data-lucide="server"></i> Hosts
-                    </a></li> -->
-                <li><a href="/performance" class="{% if active_page == 'performance' %}active{% endif %}">
-                        <i data-lucide="activity"></i> Performance
-                    </a></li>
-                <!-- <li><a href="/reports" class="{% if active_page == 'reports' %}active{% endif %}">
-                        <i data-lucide="file-text"></i> Reports
-                    </a></li> -->
-                <li><a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">
-                        <i data-lucide="settings"></i> Settings
+                <li><a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}" title="Settings">
+                        <i data-lucide="settings"></i>
+                        <span class="nav-text">Settings</span>
                     </a></li>
             </ul>
         </nav>
@@ -52,10 +64,10 @@
         <div class="sidebar-footer">
             <div class="user-info">
                 <i data-lucide="user"></i>
-                <span>{{ username }}</span>
+                <span class="user-name">{{ username }}</span>
             </div>
             <form method="POST" action="/api/auth/logout">
-                <button type="submit" class="btn-logout-sidebar">
+                <button type="submit" class="btn-logout-sidebar" title="Logout">
                     <i data-lucide="log-out"></i>
                 </button>
             </form>
@@ -88,13 +100,133 @@
         </div>
         {% endif %}
 
-        {% block content %}{% endblock %}
+        <div id="page-content">
+            {% block content %}{% endblock %}
+            {% block extra_scripts %}{% endblock %}
+        </div>
     </main>
 
     <!-- Toast Notifications -->
     <div id="toast-container"
         style="position: fixed; bottom: 2rem; right: 2rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.75rem;">
     </div>
+
+    <!-- Global Confirm Dialog -->
+    <div id="confirm-modal"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); backdrop-filter:blur(5px); z-index:10000; align-items:center; justify-content:center;">
+        <div
+            style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.75rem 2rem; width:400px; max-width:92vw; box-shadow:0 30px 70px rgba(0,0,0,0.6);">
+            <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">
+                <span id="confirm-icon-wrap"
+                    style="width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:rgba(239,68,68,0.15);">
+                    <i id="confirm-icon" data-lucide="triangle-alert" size="18" style="color:var(--danger);"></i>
+                </span>
+                <h3 id="confirm-title" style="margin:0; font-size:1rem; font-weight:600;"></h3>
+            </div>
+            <p id="confirm-message"
+                style="font-size:0.875rem; color:var(--text-dim); margin:0 0 1.5rem 0; line-height:1.6;"></p>
+            <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+                <button id="confirm-cancel-btn" onclick="_confirmResolve(false)"
+                    style="padding:0.5rem 1.1rem; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:6px; color:var(--text-main); cursor:pointer; font-size:0.875rem;">
+                    Cancel
+                </button>
+                <button id="confirm-ok-btn" onclick="_confirmResolve(true)"
+                    style="padding:0.5rem 1.25rem; border:none; border-radius:6px; color:white; cursor:pointer; font-size:0.875rem; font-weight:500; display:flex; align-items:center; gap:0.4rem; background:var(--danger);">
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── Global Confirm Utility ──────────────────────────────────────────────
+        let _confirmResolve = null;
+
+        /**
+         * showConfirm({ title, message, confirmLabel, variant, width })
+         * variant: 'danger' (default) | 'warning' | 'info'
+         * width: CSS width (e.g. '70%')
+         * Returns a Promise<boolean>
+         */
+        function showConfirm({ title = 'Are you sure?', message = '', confirmLabel = 'OK', variant = 'danger', width } = {}) {
+            return new Promise(resolve => {
+                const modal = document.getElementById('confirm-modal');
+                const iconWrap = document.getElementById('confirm-icon-wrap');
+                const icon = document.getElementById('confirm-icon');
+                const titleEl = document.getElementById('confirm-title');
+                const msgEl = document.getElementById('confirm-message');
+                const okBtn = document.getElementById('confirm-ok-btn');
+
+                const palette = {
+                    danger: { bg: 'rgba(239,68,68,0.15)', color: 'var(--danger)', btnBg: 'var(--danger)', lucide: 'triangle-alert' },
+                    warning: { bg: 'rgba(245,158,11,0.15)', color: 'var(--warning)', btnBg: 'var(--warning)', lucide: 'alert-circle' },
+                    info: { bg: 'rgba(99,102,241,0.15)', color: 'var(--primary)', btnBg: 'var(--primary)', lucide: 'info' },
+                };
+                const p = palette[variant] || palette.danger;
+
+                iconWrap.style.background = p.bg;
+                icon.style.color = p.color;
+                icon.setAttribute('data-lucide', p.lucide);
+                okBtn.style.background = p.btnBg;
+                okBtn.innerHTML = `<i data-lucide="check" size="14"></i> ${confirmLabel}`;
+
+                titleEl.textContent = title;
+                msgEl.innerHTML = message;
+
+                // Support custom width for large tables or complex dialogs
+                const contentEl = modal.querySelector('div');
+                if (width) {
+                    contentEl.style.width = width;
+                } else {
+                    contentEl.style.width = '400px'; // default
+                }
+
+                if (window.lucide) lucide.createIcons();
+
+                modal.style.display = 'flex';
+                document.getElementById('confirm-ok-btn').focus();
+
+                _confirmResolve = (result) => {
+                    modal.style.display = 'none';
+                    _confirmResolve = () => { };
+                    resolve(result);
+                };
+            });
+        }
+
+        // Close on backdrop click or ESC
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('confirm-modal').addEventListener('click', e => {
+                if (e.target === document.getElementById('confirm-modal')) _confirmResolve && _confirmResolve(false);
+            });
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape' && document.getElementById('confirm-modal').style.display === 'flex') {
+                    _confirmResolve && _confirmResolve(false);
+                }
+            });
+
+            // ── Intercept HTMX Confirmations ────────────────────────────────────
+            document.body.addEventListener('htmx:confirm', async (evt) => {
+                // Only intercept if hx-confirm has a message
+                if (!evt.detail.question) return;
+
+                // Prevent the action from starting immediately
+                evt.preventDefault();
+
+                const message = evt.detail.question;
+                const confirmed = await showConfirm({
+                    title: 'Confirmation Required',
+                    message: message,
+                    confirmLabel: 'Proceed',
+                    variant: 'danger'
+                });
+
+                if (confirmed) {
+                    // If confirmed, trigger the original action
+                    evt.detail.issueRequest();
+                }
+            });
+        });
+    </script>
 
     <!-- Login Modal -->
     <div id="loginModal" class="modal">
@@ -293,6 +425,61 @@
             }
         }
 
+        // Sidebar Toggle Logic
+        (function () {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('sidebar-toggle');
+            const body = document.body;
+
+            // Helper to get cookie
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+
+            // Helper to set cookie
+            function setCookie(name, value, days) {
+                let expires = "";
+                if (days) {
+                    const date = new Date();
+                    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                    expires = "; expires=" + date.toUTCString();
+                }
+                document.cookie = name + "=" + (value || "") + expires + "; path=/";
+            }
+
+            // Load saved state from cookie
+            let isCollapsed = getCookie('sidebarCollapsed') === 'true';
+
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+                body.classList.add('sidebar-collapsed');
+                toggleBtn.innerHTML = '<i data-lucide="chevron-right"></i>';
+            } else {
+                sidebar.classList.remove('collapsed');
+                body.classList.remove('sidebar-collapsed');
+                toggleBtn.innerHTML = '<i data-lucide="chevron-left"></i>';
+            }
+
+            toggleBtn.addEventListener('click', () => {
+                const currentlyCollapsed = body.classList.contains('sidebar-collapsed');
+                if (currentlyCollapsed) {
+                    sidebar.classList.remove('collapsed');
+                    body.classList.remove('sidebar-collapsed');
+                    toggleBtn.innerHTML = '<i data-lucide="chevron-left"></i>';
+                    setCookie('sidebarCollapsed', 'false', 365);
+                } else {
+                    sidebar.classList.add('collapsed');
+                    body.classList.add('sidebar-collapsed');
+                    toggleBtn.innerHTML = '<i data-lucide="chevron-right"></i>';
+                    setCookie('sidebarCollapsed', 'true', 365);
+                }
+                refreshIcons(toggleBtn);
+            });
+        })();
+
         document.addEventListener('DOMContentLoaded', () => {
             refreshIcons();
         });
@@ -301,6 +488,17 @@
         document.body.addEventListener('htmx:afterOnLoad', (evt) => {
             if (evt.detail.target) {
                 refreshIcons(evt.detail.target);
+            }
+            // Update active state in sidebar seamlessly
+            if (evt.detail.target && evt.detail.target.id === 'page-content') {
+                const url = new URL(evt.detail.xhr.responseURL).pathname;
+                document.querySelectorAll('nav a').forEach(a => {
+                    if (a.getAttribute('href') === url) {
+                        a.classList.add('active');
+                    } else {
+                        a.classList.remove('active');
+                    }
+                });
             }
         });
 
@@ -325,6 +523,7 @@
         async function checkServerHealth() {
             if (window.isRestartingServer) return;
             try {
+                const response = await fetch('/api/health');
                 if (response.ok || response.status === 401) { // 401 is fine, means server is up but session expired
                     handleReconnect();
                 }
@@ -433,70 +632,69 @@
         // Session timeout countdown
         {% if username %}
         (function () {
-            const SESSION_TIMEOUT = {{ settings.app_settings.session_timeout }};
-        const WARNING_THRESHOLD = 300; // 5 minutes warning
-        let sessionStartTime = Date.now();
+            const SESSION_TIMEOUT = parseInt("{{ settings.app_settings.session_timeout }}", 10);
+            const WARNING_THRESHOLD = 300; // 5 minutes warning
+            let sessionStartTime = Date.now();
 
-        // Try to get last activity from sessionStorage
-        const lastActivity = sessionStorage.getItem('lastActivity');
-        if (lastActivity) {
-            sessionStartTime = parseInt(lastActivity);
-        } else {
-            sessionStorage.setItem('lastActivity', sessionStartTime.toString());
-        }
+            // Try to get last activity from sessionStorage
+            const lastActivity = sessionStorage.getItem('lastActivity');
+            if (lastActivity) {
+                sessionStartTime = parseInt(lastActivity);
+            } else {
+                sessionStorage.setItem('lastActivity', sessionStartTime.toString());
+            }
 
-        function updateSessionTimer() {
-            const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
-            const remaining = Math.max(0, SESSION_TIMEOUT - elapsed);
+            function updateSessionTimer() {
+                const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+                const remaining = Math.max(0, SESSION_TIMEOUT - elapsed);
 
-            const minutes = Math.floor(remaining / 60);
-            const seconds = remaining % 60;
+                const minutes = Math.floor(remaining / 60);
+                const seconds = remaining % 60;
 
-            const timerElement = document.getElementById('session-time-remaining');
-            if (timerElement) {
-                timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                const timerElement = document.getElementById('session-time-remaining');
+                if (timerElement) {
+                    timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-                const timerContainer = document.getElementById('session-timer');
-                if (timerContainer) {
-                    // Change color based on remaining time
-                    if (remaining <= 60) {
-                        timerContainer.style.background = 'rgba(239, 68, 68, 0.2)';
-                        timerContainer.style.color = 'var(--danger)';
-                    } else if (remaining <= WARNING_THRESHOLD) {
-                        timerContainer.style.background = 'rgba(245, 158, 11, 0.2)';
-                        timerContainer.style.color = 'var(--warning)';
-                    } else {
-                        timerContainer.style.background = 'rgba(var(--primary-rgb), 0.1)';
-                        timerContainer.style.color = 'var(--text-dim)';
+                    const timerContainer = document.getElementById('session-timer');
+                    if (timerContainer) {
+                        // Change color based on remaining time
+                        if (remaining <= 60) {
+                            timerContainer.style.background = 'rgba(239, 68, 68, 0.2)';
+                            timerContainer.style.color = 'var(--danger)';
+                        } else if (remaining <= WARNING_THRESHOLD) {
+                            timerContainer.style.background = 'rgba(245, 158, 11, 0.2)';
+                            timerContainer.style.color = 'var(--warning)';
+                        } else {
+                            timerContainer.style.background = 'rgba(var(--primary-rgb), 0.1)';
+                            timerContainer.style.color = 'var(--text-dim)';
+                        }
                     }
+                }
+
+                // Redirect to login when session expires
+                if (remaining <= 0) {
+                    sessionStorage.removeItem('lastActivity');
+                    window.location.href = '/login';
                 }
             }
 
-            // Redirect to login when session expires
-            if (remaining <= 0) {
-                sessionStorage.removeItem('lastActivity');
-                window.location.href = '/login';
-            }
-        }
+            // Update every second
+            setInterval(updateSessionTimer, 1000);
+            updateSessionTimer();
 
-        // Update every second
-        setInterval(updateSessionTimer, 1000);
-        updateSessionTimer();
+            // Reset timer on user activity
+            const resetTimer = () => {
+                sessionStartTime = Date.now();
+                sessionStorage.setItem('lastActivity', sessionStartTime.toString());
+            };
 
-        // Reset timer on user activity
-        const resetTimer = () => {
-            sessionStartTime = Date.now();
-            sessionStorage.setItem('lastActivity', sessionStartTime.toString());
-        };
-
-        // Listen for user activity
-        ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
-            document.addEventListener(event, resetTimer, { passive: true });
-        });
-        }) ();
+            // Listen for user activity
+            ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+                document.addEventListener(event, resetTimer, { passive: true });
+            });
+        })();
         {% endif %}
     </script>
-    {% block extra_scripts %} {% endblock %}
 </body>
 
 </html>

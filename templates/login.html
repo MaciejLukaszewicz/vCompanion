@@ -104,6 +104,17 @@
         </div>
     </div>
 
+    <!-- Alert Modal for Login Page -->
+    <div id="loginAlertModal" class="modal hidden"
+        style="z-index: 10001; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center;">
+        <div class="modal-content" style="width: 400px; padding: 2rem; text-align: center;">
+            <div style="color: var(--warning); margin-bottom: 1rem;"><i data-lucide="alert-circle" size="48"></i></div>
+            <h2 id="loginAlertTitle" style="margin-bottom: 0.5rem; font-size: 1.25rem;"></h2>
+            <p id="loginAlertMessage" style="color: var(--text-dim); margin-bottom: 2rem;"></p>
+            <button onclick="closeLoginAlert()" class="btn-primary" style="width: 100%;">OK</button>
+        </div>
+    </div>
+
     <script>
         lucide.createIcons();
 
@@ -143,6 +154,18 @@
             }
         }
 
+        function showLoginAlert(title, message) {
+            const modal = document.getElementById('loginAlertModal');
+            document.getElementById('loginAlertTitle').textContent = title;
+            document.getElementById('loginAlertMessage').textContent = message;
+            modal.classList.remove('hidden');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function closeLoginAlert() {
+            document.getElementById('loginAlertModal').classList.add('hidden');
+        }
+
         // Handle form submission
         document.getElementById('loginForm').addEventListener('submit', function (e) {
             // Collect selected vCenter IDs
@@ -155,7 +178,7 @@
             // If no vCenters selected, prevent submission
             if (selectedIds.length === 0) {
                 e.preventDefault();
-                alert('Please select at least one vCenter server to connect to.');
+                showLoginAlert('vCenter Selection Required', 'Please select at least one vCenter server to connect to before signing in.');
                 return false;
             }
 

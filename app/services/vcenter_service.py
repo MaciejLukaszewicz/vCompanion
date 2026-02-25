@@ -230,6 +230,33 @@ class VCenterManager:
             self.trigger_refresh(vc_id)
         return success
 
+    def remove_snapshot(self, vc_id: str, vm_mo_id: str, snapshot_name: str, trigger_refresh: bool = True):
+        """Proxies snapshot removal to specific vCenter. Returns task ID."""
+        if vc_id not in self.connections: return None
+        conn = self.connections[vc_id]
+        if not conn.is_alive(): return None
+        task_id = conn.remove_snapshot(vm_mo_id, snapshot_name)
+        if task_id and trigger_refresh:
+            self.trigger_refresh(vc_id)
+        return task_id
+
+    def check_task_status(self, vc_id: str, task_id: str) -> dict:
+        """Proxies task status check to specific vCenter."""
+        if vc_id not in self.connections: return {"state": "error", "error": "vCenter not found"}
+        conn = self.connections[vc_id]
+        if not conn.is_alive(): return {"state": "error", "error": "vCenter not connected"}
+        return conn.check_task_status(task_id)
+
+    def create_snapshot(self, vc_id: str, vm_mo_id: str, name: str, description: str = "", trigger_refresh: bool = True) -> str | None:
+        """Proxies snapshot creation to specific vCenter. Returns task ID."""
+        if vc_id not in self.connections: return None
+        conn = self.connections[vc_id]
+        if not conn.is_alive(): return None
+        task_id = conn.create_snapshot(vm_mo_id, name, description)
+        if task_id and trigger_refresh:
+            self.trigger_refresh(vc_id)
+        return task_id
+
     def login_vcenter_appliance(self, vc_id, user, password):
         """Authenticates with the VCSA REST API for a specific vCenter."""
         if vc_id not in self.connections: return "vc_not_found"
@@ -903,7 +930,8 @@ class VCenterConnection:
                     "user": t.reason.userName if hasattr(t.reason, 'userName') else "System",
                     "start_time": t.startTime.isoformat() if t.startTime else None,
                     "completion_time": t.completeTime.isoformat() if t.completeTime else None,
-                    "status": status, "progress": progress, "error": t.error.localizedMessage if t.error else None
+                    "status": status, "progress": progress, 
+                    "error": getattr(t.error, 'localizedMessage', getattr(t.error, 'msg', str(t.error))) if t.error else None
                 })
             logger.info(f"[{self.config.name}] Fetched {len(result)} tasks in {time.time()-start_t:.2f}s")
             return result
@@ -1305,3 +1333,83 @@ class VCenterConnection:
         except Exception as e:
             logger.error(f"[{self.config.name}] Error fetching storage: {e}")
             return {}
+
+    def remove_snapshot(self, vm_mo_id: str, snapshot_name: str) -> bool:
+        """Removes a snapshot by its name from a given VM."""
+        if not self.content: return False
+        try:
+            # Locate the VM
+            vm = vim.VirtualMachine(vm_mo_id, stub=self.content.sessionManager._stub)
+            if not vm or not vm.snapshot or not vm.snapshot.rootSnapshotList:
+                logger.error(f"[{self.config.name}] Target VM {vm_mo_id} lacking snapshots.")
+                return False
+                
+            # Recursive search for the snapshot object
+            def find_snap(snap_list, name):
+                for s in snap_list:
+                    if s.name == name:
+                        return s.snapshot
+                    if s.childSnapshotList:
+                        child_res = find_snap(s.childSnapshotList, name)
+                        if child_res: return child_res
+                return None
+                
+            snap_obj = find_snap(vm.snapshot.rootSnapshotList, snapshot_name)
+            if not snap_obj:
+                logger.error(f"[{self.config.name}] Snapshot '{snapshot_name}' not found on VM {vm_mo_id}.")
+                return False
+                
+            # Request deletion (removeChildren=False to only remove THIS snapshot)
+            task = snap_obj.RemoveSnapshot_Task(removeChildren=False)
+            logger.info(f"[{self.config.name}] Dispatched RemoveSnapshot_Task for VM {vm_mo_id}, Snapshot: {snapshot_name}, Task ID: {task._moId}")
+            return task._moId
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Failed to remove snapshot: {e}")
+            return None
+
+    def check_task_status(self, task_id: str) -> dict:
+        """Checks the status of a scheduled task."""
+        if not self.content: return {"state": "error", "error": "Not connected"}
+        try:
+            task = vim.Task(task_id, stub=self.content.sessionManager._stub)
+            state = getattr(task.info, 'state', getattr(task.info, 'state', None))
+            # PyVmomi encapsulates states into vim.TaskInfo.State (e.g. 'queued', 'running', 'success', 'error')
+            if hasattr(state, 'val'): state = state.val # Unwrap if it's enum
+            elif isinstance(state, type) or callable(state): state = str(state) # Edge cases
+            else: state = str(state)
+
+            res = {
+                "state": state,
+                "progress": getattr(task.info, 'progress', 0)
+            }
+            if state == 'error':
+                task_error = task.info.error
+                if task_error:
+                     res["error"] = getattr(task_error, 'localizedMessage', getattr(task_error, 'msg', str(task_error)))
+                else:
+                     res["error"] = "Unknown error during task execution"
+            return res
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Failed to get task status for {task_id}: {e}")
+            return {"state": "error", "error": str(e)}
+
+    def create_snapshot(self, vm_mo_id: str, name: str, description: str = "") -> str | None:
+        """Creates a snapshot on a given VM. Returns task ID or None on failure."""
+        if not self.content: return None
+        try:
+            vm = vim.VirtualMachine(vm_mo_id, stub=self.content.sessionManager._stub)
+            if not vm:
+                logger.error(f"[{self.config.name}] VM {vm_mo_id} not found.")
+                return None
+            task = vm.CreateSnapshot_Task(
+                name=name,
+                description=description,
+                memory=False,
+                quiesce=False
+            )
+            logger.info(f"[{self.config.name}] Dispatched CreateSnapshot_Task for VM {vm_mo_id}, name='{name}', task={task._moId}")
+            return task._moId
+        except Exception as e:
+            logger.error(f"[{self.config.name}] Failed to create snapshot: {e}")
+            return None
+

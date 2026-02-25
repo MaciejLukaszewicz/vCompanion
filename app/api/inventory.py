@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
-from app.core.session import require_auth, is_elevated_unlocked
+from app.core.session import require_auth, is_elevated_unlocked, is_authenticated
 import logging
 import csv
 import io
@@ -73,6 +73,41 @@ async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = Fals
         "selected_vm_id": selected_vm_id,
         "selected_vcenter_id": selected_vcenter_id
     })
+
+@router.get("/lookup-vm/{name}")
+async def lookup_vm_by_name(request: Request, name: str):
+    """Looks up a VM by name across all vCenters. Returns basic info if found."""
+    require_auth(request)
+    vms = request.app.state.vcenter_manager.cache.get_all_vms()
+    
+    # Simple exact match
+    match = next((v for v in vms if v.get('name').lower() == name.lower()), None)
+    if not match:
+        # Try partial match if no exact
+        match = next((v for v in vms if name.lower() in v.get('name').lower()), None)
+    
+    if match:
+        return {
+            "name": match.get('name'),
+            "vcenter_id": match.get('vcenter_id'),
+            "vm_id": match.get('id')
+        }
+    
+    return JSONResponse(status_code=404, content={"message": "VM not found"})
+
+@router.get("/verify-snapshot/{vcenter_id}/{vm_id}/{snapshot_name}")
+async def verify_snapshot(request: Request, vcenter_id: str, vm_id: str, snapshot_name: str):
+    """Verifies if a snapshot exists for a given VM in the cache."""
+    require_auth(request)
+    vms = request.app.state.vcenter_manager.cache.get_all_vms()
+    vm = next((v for v in vms if v.get('vcenter_id') == vcenter_id and v.get('id') == vm_id), None)
+    
+    if not vm:
+        return {"found": False, "message": "VM not found in cache"}
+        
+    snaps = vm.get('snapshots', [])
+    found = any(s.get('name') == snapshot_name for s in snaps)
+    return {"found": found}
 
 @router.get("/vm-details/{vcenter_id}/{vm_id}")
 async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
@@ -267,7 +302,8 @@ async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
         "request": request,
         "vm": vm,
         "network_tree": network_tree,
-        "storage_tree": storage_tree
+        "storage_tree": storage_tree,
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
 
 @router.get("/hosts")
@@ -509,8 +545,123 @@ async def get_snapshots_partial(request: Request, today_only: bool = False):
     return templates.TemplateResponse("partials/snapshots_table.html", {
         "request": request,
         "global_snapshots": global_snapshots,
-        "snap_count": len(global_snapshots)
+        "snap_count": len(global_snapshots),
+        "elevated_unlocked": is_elevated_unlocked(request)
     })
+
+@router.post("/snapshots/create")
+async def create_snapshot_endpoint(request: Request):
+    """Creates a new snapshot on a VM. Requires elevated privileges."""
+    require_auth(request)
+    if not is_elevated_unlocked(request):
+        return JSONResponse({"success": False, "error": "Elevated privileges required"}, status_code=403)
+
+    try:
+        data = await request.json()
+        vc_id = data.get('vcenter_id')
+        vm_id = data.get('vm_id')
+        snap_name = data.get('snapshot_name', '').strip()
+        snap_desc = data.get('snapshot_description', '').strip()
+
+        if not all([vc_id, vm_id, snap_name]):
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+
+        manager = request.app.state.vcenter_manager
+        task_id = manager.create_snapshot(vc_id, vm_id, snap_name, snap_desc)
+
+        if task_id:
+            return JSONResponse({"success": True, "task_id": task_id})
+        else:
+            return JSONResponse({"success": False, "error": "Failed to create snapshot. Check logs."}, status_code=500)
+    except Exception as e:
+        logger.error(f"Error in create_snapshot_endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+@router.post("/snapshots/delete")
+async def delete_snapshot_endpoint(request: Request):
+    """Deletes a specific snapshot. Requires elevated privileges."""
+    require_auth(request)
+    if not is_elevated_unlocked(request):
+        return JSONResponse({"success": False, "error": "Elevated privileges required"}, status_code=403)
+        
+    try:
+        data = await request.json()
+        vc_id = data.get('vcenter_id')
+        vm_id = data.get('vm_id')
+        snap_name = data.get('snapshot_name')
+        
+        if not all([vc_id, vm_id, snap_name]):
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+            
+        manager = request.app.state.vcenter_manager
+        task_id = manager.remove_snapshot(vc_id, vm_id, snap_name)
+        
+        if task_id:
+            return JSONResponse({"success": True, "task_id": task_id})
+        else:
+            return JSONResponse({"success": False, "error": "Failed to delete snapshot. Check logs."}, status_code=500)
+    except Exception as e:
+        logger.error(f"Error in delete_snapshot_endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+@router.get("/tasks/{vcenter_id}/{task_id}")
+async def get_task_status(request: Request, vcenter_id: str, task_id: str):
+    """Gets the status of an ongoing task in a vCenter."""
+    if not is_authenticated(request):
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
+        
+    try:
+        manager = request.app.state.vcenter_manager
+        status = manager.check_task_status(vcenter_id, task_id)
+        return JSONResponse({"success": True, "status": status})
+    except Exception as e:
+        logger.error(f"Error checking task status: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+@router.post("/snapshots/delete-bulk")
+async def delete_snapshots_bulk_endpoint(request: Request):
+    """Deletes multiple snapshots. Requires elevated privileges."""
+    require_auth(request)
+    if not is_elevated_unlocked(request):
+        return JSONResponse({"success": False, "error": "Elevated privileges required"}, status_code=403)
+        
+    try:
+        data = await request.json()
+        snapshots = data.get('snapshots', [])
+        
+        if not snapshots:
+            raise HTTPException(status_code=400, detail="No snapshots provided")
+            
+        manager = request.app.state.vcenter_manager
+        results = []
+        affected_vcenters = set()
+        
+        for snap in snapshots:
+            vc_id = snap.get('vcenter_id')
+            vm_id = snap.get('vm_id')
+            snap_name = snap.get('snapshot_name')
+            # Pass trigger_refresh=False to avoid individual rapid refreshes
+            task_id = manager.remove_snapshot(vc_id, vm_id, snap_name, trigger_refresh=False)
+            
+            if task_id:
+                affected_vcenters.add(vc_id)
+            
+            results.append({
+                "vcenter_id": vc_id, 
+                "vm_id": vm_id, 
+                "snapshot_name": snap_name, 
+                "success": task_id is not None, 
+                "task_id": task_id
+            })
+            
+        # Trigger a single refresh for each affected vCenter
+        for vc_id in affected_vcenters:
+            manager.trigger_refresh(vc_id)
+            
+        return JSONResponse({"success": True, "results": results})
+    except Exception as e:
+        logger.error(f"Error in delete_snapshots_bulk_endpoint: {e}")
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 @router.get("/export/vms")
 async def export_vms_csv(request: Request, q: str = "", snaps_only: bool = False):
