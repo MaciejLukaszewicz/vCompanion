@@ -65,6 +65,21 @@
 *   **Uptime Tracking**: Accurate uptime calculation with build information
 *   **Network Profile**: Detailed networking configuration including VMkernel adapters
 *   **Storage Profile**: Connected datastores with capacity and accessibility status
+*   **Service Management**: Toggle SSH services on ESXi hosts directly from the UI (requires Elevated Privileges)
+
+### 📸 Active Snapshot Management
+*   **Global Snapshots Cockpit**: Centralized view of all snapshots across your entire infrastructure
+- **Single & Batch Creation**: Take snapshots for one or many VMs simultaneously using a name list
+*   **Smart Bulk Deletion**: Select multiple snapshots and delete them with a detailed confirmation preview (VM name, Snapshot name, Created at, Description)
+*   **Automatic Task Tracking**: Live monitoring of snapshot tasks with real-time UI updates and toast notifications
+*   **Optimized Performance**: Thread-safe caching and background refreshes prevent UI hangs during large-scale operations
+
+### 🔓 Security & Privileged Operations
+*   **Elevated Privileges**: Session-based locking for sensitive operations (like SSH toggles) to prevent accidental changes
+*   **Visual Safety Indicators**: Shield icons and color-coded states indicate when privileged mode is active
+*   **Zero Password Storage**: vCenter passwords are never stored on disk or in browser cookies
+*   **Volatile RAM Keys**: Encryption keys derived from user passwords (PBKDF2) kept only in volatile memory
+*   **AES-128 Encryption**: All cached data is encrypted with industry-standard encryption
 
 ### ⚙️ Settings Panel
 *   **vCenter Management**: Add, edit, enable/disable, and remove vCenter connections
@@ -72,13 +87,6 @@
 *   **Session Control**: Configurable session timeout with visual countdown timer
 *   **Cache Management**: Manual cache purge for troubleshooting
 *   **Refresh Intervals**: Per-vCenter and global refresh rate configuration
-
-### 🔒 Security & Privacy
-*   **Zero Password Storage**: vCenter passwords are never stored on disk or in browser cookies
-*   **Volatile RAM Keys**: Encryption keys derived from user passwords (PBKDF2) kept only in volatile memory
-*   **AES-128 Encryption**: All cached data is encrypted with industry-standard encryption
-*   **Session Management**: Secure sessions with configurable inactivity timeout and visual countdown
-*   **Auto-Invalidation**: Server restarts automatically invalidate all encryption keys
 
 ### 📈 Reporting & Export
 *   **CSV Reports**: Generate detailed reports for inventory and critical events
