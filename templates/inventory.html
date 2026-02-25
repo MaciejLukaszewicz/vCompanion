@@ -316,7 +316,7 @@
 
         <div id="snapshots-content" style="display: none; height: 400px; overflow-y: auto;"
             hx-get="/api/inventory/snapshots" hx-trigger="load, vcenter-refreshed from:body"
-            hx-target="#snapshots-list-target">
+            hx-target="#snapshots-list-target" hx-include="#snap-filters">
             <div id="snapshots-list-target">
                 <div style="padding: 3rem; text-align: center; color: var(--text-dim);">
                     <div class="spinner-small" style="margin-bottom: 1rem;"></div>
