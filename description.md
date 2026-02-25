@@ -138,27 +138,20 @@ graph TD
 - **Networks** — Distributed and Standard switches, VLANs, portgroups, VMkernel services
 - Search and CSV export for all inventory tables
 
-### Performance
-- Top VMs and Hosts by CPU and memory usage
-- Cluster resource overview with CPU, memory, and storage utilization percentages
+### Snapshot Management
+- **Single & Batch Creation** — take snapshots for one or many VMs simultaneously
+- **Global Snapshot Cockpit** — unified view of all snapshots across the infrastructure
+- **Bulk Deletion** — multi-select deletion with a detailed summary preview
+- **Task Tracking** — live polling and status updates for long-running vCenter tasks
+- **Performance Optimized** — thread-safe cache updates prevent UI hangs during large operations
 
-### Storage
-- Datastore Clusters with nested Datastores
-- Visual capacity bars (color-coded: green/amber/red)
-- Host access matrix per datastore
-
-### Settings
-- Add, edit, enable/disable, and remove vCenter connections
-- Light/Dark theme toggle and accent color selection (applied immediately)
-- Session timeout configuration
-- Global and per-vCenter refresh interval
-- Cache purge and server restart/shutdown controls
-
-### Security
-- Zero password storage — passwords never written to disk or cookies
-- Encryption keys exist only in RAM; server restart invalidates all sessions
-- Session inactivity timeout with visual countdown timer
-- Stale session cookies invalidated server-side on expiry
+### Management & Security
+- **SSH Service Control** — toggle SSH on ESXi hosts and VCSA directly from the UI
+- **Elevated Privileges** — session-based security lock for sensitive system operations
+- **Zero Password Storage** — passwords never written to disk or cookies
+- **Encryption** — AES-128 keys derived from user password (PBKDF2), exists only in RAM
+- **Volatile keys** — server restart invalidates all current sessions and encryption keys
+- **Session Timeout** — inactivity-based logout with visual countdown timer
 
 ---
 
