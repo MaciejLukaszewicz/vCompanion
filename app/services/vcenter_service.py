@@ -230,13 +230,13 @@ class VCenterManager:
             self.trigger_refresh(vc_id)
         return success
 
-    def remove_snapshot(self, vc_id: str, vm_mo_id: str, snapshot_name: str):
-        """Proxies snapshot removal to specific vCenter and triggers a refresh. Returns task ID."""
+    def remove_snapshot(self, vc_id: str, vm_mo_id: str, snapshot_name: str, trigger_refresh: bool = True):
+        """Proxies snapshot removal to specific vCenter. Returns task ID."""
         if vc_id not in self.connections: return None
         conn = self.connections[vc_id]
         if not conn.is_alive(): return None
         task_id = conn.remove_snapshot(vm_mo_id, snapshot_name)
-        if task_id:
+        if task_id and trigger_refresh:
             self.trigger_refresh(vc_id)
         return task_id
 
@@ -247,13 +247,13 @@ class VCenterManager:
         if not conn.is_alive(): return {"state": "error", "error": "vCenter not connected"}
         return conn.check_task_status(task_id)
 
-    def create_snapshot(self, vc_id: str, vm_mo_id: str, name: str, description: str = "") -> str | None:
-        """Proxies snapshot creation to specific vCenter and triggers a refresh. Returns task ID."""
+    def create_snapshot(self, vc_id: str, vm_mo_id: str, name: str, description: str = "", trigger_refresh: bool = True) -> str | None:
+        """Proxies snapshot creation to specific vCenter. Returns task ID."""
         if vc_id not in self.connections: return None
         conn = self.connections[vc_id]
         if not conn.is_alive(): return None
         task_id = conn.create_snapshot(vm_mo_id, name, description)
-        if task_id:
+        if task_id and trigger_refresh:
             self.trigger_refresh(vc_id)
         return task_id
 

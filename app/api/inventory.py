@@ -634,12 +634,29 @@ async def delete_snapshots_bulk_endpoint(request: Request):
             
         manager = request.app.state.vcenter_manager
         results = []
+        affected_vcenters = set()
+        
         for snap in snapshots:
             vc_id = snap.get('vcenter_id')
             vm_id = snap.get('vm_id')
             snap_name = snap.get('snapshot_name')
-            task_id = manager.remove_snapshot(vc_id, vm_id, snap_name)
-            results.append({"vcenter_id": vc_id, "vm_id": vm_id, "snapshot_name": snap_name, "success": task_id is not None, "task_id": task_id})
+            # Pass trigger_refresh=False to avoid individual rapid refreshes
+            task_id = manager.remove_snapshot(vc_id, vm_id, snap_name, trigger_refresh=False)
+            
+            if task_id:
+                affected_vcenters.add(vc_id)
+            
+            results.append({
+                "vcenter_id": vc_id, 
+                "vm_id": vm_id, 
+                "snapshot_name": snap_name, 
+                "success": task_id is not None, 
+                "task_id": task_id
+            })
+            
+        # Trigger a single refresh for each affected vCenter
+        for vc_id in affected_vcenters:
+            manager.trigger_refresh(vc_id)
             
         return JSONResponse({"success": True, "results": results})
     except Exception as e:
