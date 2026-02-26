@@ -40,14 +40,26 @@ class VCenterManager:
         logger.info("Background refresh worker stopped.")
 
     def _worker_loop(self):
+        last_heartbeat = 0
         while not self._stop_event.is_set():
             try:
                 if not self.cache.is_unlocked(): break
                 now = time.time()
+                
+                # Heartbeat check every 10 seconds
+                is_heartbeat = (now - last_heartbeat >= 10)
+                if is_heartbeat:
+                    last_heartbeat = now
+                
                 for vc_id, conn in self.connections.items():
+                    # 1. Update connectivity status periodically
+                    if is_heartbeat:
+                        conn.check_alive()
+                        
+                    # 2. Trigger full refresh if interval reached
                     interval = conn.config.refresh_interval or self.global_refresh_interval
                     if now - self._last_refresh_trigger[vc_id] >= interval:
-                        if conn.is_alive():
+                        if conn.is_alive(): # This is now the non-blocking cached check
                             self.trigger_refresh(vc_id)
             except Exception as e:
                 logger.error(f"Worker loop error: {e}")
@@ -298,13 +310,40 @@ class VCenterConnection:
         self.appliance_token = None
         self.last_appliance_error = None
         self.last_error_type = None  # Added to track vCenter connection error type
+        self._is_alive = False
 
     def is_alive(self):
-        if not self.si: return False
+        """Non-blocking check of last known status."""
+        return self._is_alive
+
+    def check_alive(self):
+        """Actual network check, called by worker or connect."""
+        if not self.si: 
+            self._is_alive = False
+            return False
         try:
+            # Low timeout for these periodic checks
             self.si.CurrentTime()
+            self._is_alive = True
+            # If we were previously disconnected due to an error, clear it now that we are alive
+            if self.last_error_type in ['network', 'timeout', 'ssl', 'unknown']:
+                self.last_error_type = None
             return True
-        except: return False
+        except (socket.timeout, TimeoutError):
+            self._is_alive = False
+            self.last_error_type = 'timeout'
+            return False
+        except (socket.gaierror, ConnectionError, OSError):
+            self._is_alive = False
+            self.last_error_type = 'network'
+            return False
+        except Exception as e:
+            logger.debug(f"[{self.config.name}] check_alive failed: {e}")
+            self._is_alive = False
+            # Only set to unknown if we don't have a better reason
+            if not self.last_error_type:
+                self.last_error_type = 'unknown'
+            return False
 
     def _appliance_rest_call(self, method, endpoint, data=None):
         """Helper for VCSA REST API calls (Appliance API)"""
@@ -480,45 +519,61 @@ class VCenterConnection:
             self.content = self.si.RetrieveContent()
             logger.info(f"[{self.config.name}] Successfully connected")
             self.last_error_type = None
+            self._is_alive = True
             return (True, None, None)
         except vim.fault.InvalidLogin as e:
             # Wrong username or password
             logger.warning(f"[{self.config.name}] Authentication failed: Invalid credentials")
             self.last_error_type = 'auth'
+            self._is_alive = False
             return (False, 'auth', 'Invalid username or password')
         except (ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError) as e:
             # Connection refused - vCenter might be down or unreachable
             logger.error(f"[{self.config.name}] Connection refused: {str(e)}")
             self.last_error_type = 'network'
+            self._is_alive = False
             return (False, 'network', f'Connection refused - vCenter may be down or unreachable')
         except (TimeoutError, socket.timeout) as e:
             # Timeout - network issue or VPN disconnected
             logger.error(f"[{self.config.name}] Connection timeout: {str(e)}")
             self.last_error_type = 'timeout'
+            self._is_alive = False
             return (False, 'timeout', 'Connection timeout - check network connectivity or VPN')
+        except socket.gaierror as e:
+            # DNS error - VPN likely disconnected or wrong host
+            logger.error(f"[{self.config.name}] DNS lookup failed: {str(e)}")
+            self.last_error_type = 'network'
+            self._is_alive = False
+            return (False, 'network', 'DNS lookup failed - check VPN or network connectivity')
         except ssl.SSLError as e:
             # SSL certificate error
             logger.error(f"[{self.config.name}] SSL error: {str(e)}")
             self.last_error_type = 'ssl'
+            self._is_alive = False
             return (False, 'ssl', f'SSL certificate error: {str(e)}')
         except OSError as e:
             # Generic network errors (DNS, unreachable host, etc.)
-            if 'timed out' in str(e).lower():
+            err_msg = str(e).lower()
+            if 'timed out' in err_msg:
                 logger.error(f"[{self.config.name}] Network timeout: {str(e)}")
                 self.last_error_type = 'timeout'
+                self._is_alive = False
                 return (False, 'timeout', 'Network timeout - check VPN or network connectivity')
-            elif 'no route to host' in str(e).lower() or 'unreachable' in str(e).lower():
+            elif 'no route to host' in err_msg or 'unreachable' in err_msg or 'getaddrinfo' in err_msg:
                 logger.error(f"[{self.config.name}] Host unreachable: {str(e)}")
                 self.last_error_type = 'network'
+                self._is_alive = False
                 return (False, 'network', 'Host unreachable - check network or VPN connection')
             else:
                 logger.error(f"[{self.config.name}] Network error: {str(e)}")
                 self.last_error_type = 'network'
+                self._is_alive = False
                 return (False, 'network', f'Network error: {str(e)}')
         except Exception as e:
             # Catch-all for unexpected errors
             logger.error(f"[{self.config.name}] Unexpected error during connection: {str(e)}")
             self.last_error_type = 'unknown'
+            self._is_alive = False
             return (False, 'unknown', f'Unexpected error: {str(e)}')
 
     def disconnect(self):

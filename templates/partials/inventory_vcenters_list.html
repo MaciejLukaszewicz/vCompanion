@@ -12,7 +12,12 @@
         {% for vc in vcenters %}
         <tr class="vcenter-row">
             <td style="font-weight: 600; color: var(--text-main);">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;" {% if not vc.connected %}
+                    {% if vc.error_type in ['network', 'timeout' , 'ssl' ] %}
+                    onclick="window.showNotification('Connection problem ({{ vc.error_type }}). Check your VPN or network connectivity.', 'warning')"
+                    {% else %} onclick="openLoginModal('{{ vc.id }}', '{{ vc.name|e }}')" {% endif %} {% else %}
+                    onclick="htmx.trigger(this, 'click')" hx-post="/api/vcenters/refresh/{{ vc.id }}" hx-swap="none" {%
+                    endif %}>
                     {% if vc.connected %}
                     <span class="status-indicator status-ready" title="vCenter connected and active"></span>
                     {% else %}

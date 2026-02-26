@@ -1,9 +1,12 @@
 {% for vc in vcenter_status %}
 <div class="vcenter-pill {{ 'connected' if vc.connected else 'disconnected' }} refresh-{{ vc.refresh_status | lower }}"
-    data-vcenter-id="{{ vc.id }}" {% if vc.connected %} {% if vc.refresh_status !='REFRESHING' %}
-    hx-post="/api/vcenters/refresh/{{ vc.id }}" hx-trigger="click" hx-swap="none" title="Click to refresh this vCenter"
-    style="cursor: pointer;" {% endif %} {% else %} onclick="openLoginModal('{{ vc.id }}')"
-    title="Disconnected - click to try reconnecting" style="cursor: pointer;" {% endif %}>
+    {% if vc.connected %} {% if vc.refresh_status !='REFRESHING' %} hx-post="/api/vcenters/refresh/{{ vc.id }}"
+    hx-trigger="click" hx-swap="none" title="Click to refresh this vCenter" style="cursor: pointer;" {% endif %} {% else
+    %} {% if vc.error_type in ['network', 'timeout' , 'ssl' ] %}
+    onclick="window.showNotification('Connection problem ({{ vc.error_type }}). Check your VPN or network connectivity.', 'warning')"
+    title="Connection error ({{ vc.error_type }}) - check VPN/Network" {% else %}
+    onclick="openLoginModal('{{ vc.id }}')" title="Authentication issue or status unknown - click to login" {% endif %}
+    style="cursor: pointer;" {% endif %}>
 
     {% if vc.connected %}
     <span class="status-indicator"></span>
