@@ -1286,11 +1286,17 @@
         refreshInventoryPanels();
     }
 
-    // Initialize on load
-    document.addEventListener('DOMContentLoaded', () => {
+    // Initialize on load (handle both direct and HTMX loads)
+    function initInventory() {
         window.isSearchFocused = false;
         initInventoryResizers();
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initInventory);
+    } else {
+        initInventory();
+    }
 
     // --- Take Snapshot Modal ---
     let _snapModalVcId = null;
