@@ -165,6 +165,7 @@
                         <input type="text" id="vm-search" name="q"
                             placeholder="Search by Name, IP, vCenter, Host, Snapshot..."
                             onfocus="window.isSearchFocused = true" onblur="window.isSearchFocused = false"
+                            oninput="handleVmSearchInput(this)"
                             style="width: 100%; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 2.5rem 0.4rem 2.25rem; font-size: 0.85rem; color: var(--text-main);">
                         <!-- Clear Search Button -->
                         <div id="clear-search" onclick="clearVmSearch()"
@@ -690,18 +691,18 @@
     });
 
     // Handle clear search
-    const searchInput = document.getElementById('vm-search');
-    const clearBtn = document.getElementById('clear-search');
-
-    searchInput.addEventListener('input', function () {
-        clearBtn.style.display = this.value ? 'block' : 'none';
-    });
+    function handleVmSearchInput(input) {
+        const clearBtn = document.getElementById('clear-search');
+        if (clearBtn) clearBtn.style.display = input.value ? 'block' : 'none';
+    }
 
     function clearVmSearch() {
-        searchInput.value = '';
-        clearBtn.style.display = 'none';
+        const searchInput = document.getElementById('vm-search');
+        const clearBtn = document.getElementById('clear-search');
+        if (searchInput) searchInput.value = '';
+        if (clearBtn) clearBtn.style.display = 'none';
         // Manually trigger HTMX update
-        htmx.trigger('#vm-search', 'keyup');
+        if (searchInput) htmx.trigger(searchInput, 'keyup');
     }
 
     function syncVmSelection(vcenterId, vmId) {
@@ -1286,11 +1287,17 @@
         refreshInventoryPanels();
     }
 
-    // Initialize on load
-    document.addEventListener('DOMContentLoaded', () => {
+    // Initialize on load (handle both direct and HTMX loads)
+    function initInventory() {
         window.isSearchFocused = false;
         initInventoryResizers();
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initInventory);
+    } else {
+        initInventory();
+    }
 
     // --- Take Snapshot Modal ---
     let _snapModalVcId = null;
