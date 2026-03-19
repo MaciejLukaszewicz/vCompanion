@@ -1303,6 +1303,33 @@
     function initInventory() {
         window.isSearchFocused = false;
         initInventoryResizers();
+
+        const hash = window.location.hash;
+        if (hash === '#vms' || hash === '#snapshots' || hash === '#hosts') {
+            const sectionName = hash.substring(1); // 'vms', 'snapshots', 'hosts'
+            
+            // By default, VMs section is open. If another is requested, close VMs section.
+            if (sectionName !== 'vms') {
+                const vmsContent = document.getElementById('vms-content');
+                if (vmsContent && vmsContent.style.display !== 'none') {
+                    toggleInventorySection('vms-content', 'vms-toggle-icon');
+                }
+                
+                const targetContent = document.getElementById(sectionName + '-content');
+                if (targetContent && targetContent.style.display === 'none') {
+                    toggleInventorySection(sectionName + '-content', sectionName + '-toggle-icon');
+                }
+                setTimeout(() => {
+                    const sectionEl = document.getElementById(sectionName + '-section');
+                    if (sectionEl) sectionEl.scrollIntoView({behavior: 'smooth'});
+                }, 100);
+            } else {
+                const vmsContent = document.getElementById('vms-content');
+                if (vmsContent && vmsContent.style.display === 'none') {
+                    toggleInventorySection('vms-content', 'vms-toggle-icon');
+                }
+            }
+        }
     }
 
     if (document.readyState === 'loading') {
