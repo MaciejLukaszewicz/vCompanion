@@ -5,13 +5,19 @@
 </div>
 {% endif %}
 
-<form hx-post="/api/settings/application/update" hx-target="#settings-content-area" class="vcompanion-form">
+<div class="vcompanion-form">
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
         <!-- Left Side: General & Actions -->
         <div style="display: flex; flex-direction: column; gap: 2.5rem;">
             <!-- General Group -->
-            <div class="settings-section">
-                <h3 class="section-header"><i data-lucide="settings" size="14"></i> General</h3>
+            <form hx-post="/api/settings/application/update" hx-target="#settings-content-area" oninput="document.getElementById('general-save-btn').style.display='flex'" onchange="document.getElementById('general-save-btn').style.display='flex'">
+                <div class="settings-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); padding-bottom: 0.6rem;">
+                        <h3 class="section-header" style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;"><i data-lucide="settings" size="14"></i> General</h3>
+                        <button type="submit" id="general-save-btn" class="btn-primary" style="display: none; padding: 0.4rem 0.8rem; font-size: 0.75rem;">
+                            <i data-lucide="save" size="14"></i> Save
+                        </button>
+                    </div>
 
                 <div class="form-group" style="margin-bottom: 1.5rem;">
                     <label>Application Title</label>
@@ -67,6 +73,7 @@
                     </div>
                 </div>
             </div>
+            </form>
 
             <!-- System Actions Group -->
             <div class="settings-section">
@@ -92,7 +99,7 @@
         </div>
 
         <!-- Right Side: Appearance & Logging -->
-        <div style="display: flex; flex-direction: column; gap: 2.5rem;">
+        <form hx-post="/api/settings/application/update" hx-trigger="change" hx-swap="none" style="display: flex; flex-direction: column; gap: 2.5rem;">
             <!-- Appearance Group -->
             <div class="settings-section">
                 <h3 class="section-header"><i data-lucide="layout" size="14"></i> Appearance</h3>
@@ -163,21 +170,14 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </form>
     </div>
 
     <!-- Add script to refresh icons -->
     <script>
         if (typeof lucide !== 'undefined') lucide.createIcons();
     </script>
-
-    <div
-        style="display: flex; justify-content: flex-end; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
-        <button type="submit" class="btn-primary">
-            <i data-lucide="save"></i> Save Application Settings
-        </button>
-    </div>
-</form>
+</div>
 
 <style>
     .section-header {

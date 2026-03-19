@@ -188,31 +188,37 @@ async def get_application_settings(request: Request):
 @router.post("/application/update")
 async def update_application_settings(
     request: Request,
-    title: str = Form(...),
-    refresh_interval_seconds: int = Form(...),
-    log_level: str = Form(...),
-    theme: str = Form(...),
-    accent_color: str = Form("blue"),
-    port: int = Form(8000),
+    title: str = Form(None),
+    refresh_interval_seconds: int = Form(None),
+    log_level: str = Form(None),
+    theme: str = Form(None),
+    accent_color: str = Form(None),
+    port: int = Form(None),
 ):
     """Updates global application settings."""
     require_auth(request)
 
-    # Read raw form data to correctly handle checkbox fields.
-    # Checkboxes send nothing when unchecked, so we use a hidden field with value="false"
-    # followed by the checkbox with value="true". We check if "true" appears in the values list.
     form_data = await request.form()
-    log_to_file = "true" in form_data.getlist("log_to_file")
-    open_browser_on_start = "true" in form_data.getlist("open_browser_on_start")
+    
+    if title is not None:
+        settings.app_settings.title = title
+    if refresh_interval_seconds is not None:
+        settings.app_settings.refresh_interval_seconds = refresh_interval_seconds
+    if log_level is not None:
+        settings.app_settings.log_level = log_level
+    if theme is not None:
+        settings.app_settings.theme = theme
+    if accent_color is not None:
+        settings.app_settings.accent_color = accent_color
+    if port is not None:
+        settings.app_settings.port = port
 
-    settings.app_settings.title = title
-    settings.app_settings.refresh_interval_seconds = refresh_interval_seconds
-    settings.app_settings.log_level = log_level
-    settings.app_settings.log_to_file = log_to_file
-    settings.app_settings.theme = theme
-    settings.app_settings.accent_color = accent_color
-    settings.app_settings.port = port
-    settings.app_settings.open_browser_on_start = open_browser_on_start
+    # Hidden inputs ensure these keys are always present when their specific form is submitted
+    if "log_to_file" in form_data:
+        settings.app_settings.log_to_file = "true" in form_data.getlist("log_to_file")
+    if "open_browser_on_start" in form_data:
+        settings.app_settings.open_browser_on_start = "true" in form_data.getlist("open_browser_on_start")
+
     save_config(settings)
     
     # Update logging configuration dynamically
@@ -221,7 +227,7 @@ async def update_application_settings(
     
     # Update manager if needed
     if hasattr(request.app.state, 'vcenter_manager'):
-        request.app.state.vcenter_manager.global_refresh_interval = refresh_interval_seconds
+        request.app.state.vcenter_manager.global_refresh_interval = settings.app_settings.refresh_interval_seconds
         
     from main import templates
     return templates.TemplateResponse("partials/settings_application.html", {
