@@ -1,4 +1,4 @@
-<div class="stat-card">
+<div class="stat-card" onclick="window.location.href='/inventory#vms'" style="cursor: pointer;" title="Go to Virtual Machines inventory">
     <h3>Total Virtual Machines</h3>
     <div class="value">{{ stats.total_vms | default('--') }}</div>
     <div style="font-size: 0.875rem; color: var(--text-dim); margin-top: 0.5rem;">{{ stats.vms_delta |
@@ -16,7 +16,7 @@
     {% endif %}
 </div>
 
-<div class="stat-card">
+<div class="stat-card" onclick="window.location.href='/inventory#snapshots'" style="cursor: pointer;" title="Go to Snapshots inventory">
     <h3>Active Snapshots</h3>
     <div class="value">{{ stats.snapshots | default('--') }}</div>
     <div style="font-size: 0.875rem; color: var(--text-dim); margin-top: 0.5rem;">{{ stats.snapshots_delta |
@@ -34,7 +34,7 @@
     {% endif %}
 </div>
 
-<div class="stat-card">
+<div class="stat-card" onclick="window.location.href='/inventory#hosts'" style="cursor: pointer;" title="Go to Hosts inventory">
     <h3>Host Systems</h3>
     <div class="value">{{ stats.clusters | default('--') }}</div>
     <div style="font-size: 0.875rem; color: var(--text-dim); margin-top: 0.5rem;">{{ stats.clusters_status |
