@@ -48,15 +48,15 @@
         <div
             style="background: rgba(var(--primary-rgb), 0.03); border: 1px solid var(--border); padding: 1.25rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <div
+                <div id="elevated-icon-wrapper"
                     style="width: 40px; height: 40px; border-radius: 50%; background: {{ 'rgba(34, 197, 94, 0.1)' if elevated_unlocked else 'rgba(239, 68, 68, 0.1)' }}; display: flex; align-items: center; justify-content: center;">
-                    <i data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}"
+                    <i id="elevated-icon" data-lucide="{{ 'shield-check' if elevated_unlocked else 'shield-alert' }}"
                         style="color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }};"></i>
                 </div>
                 <div>
                     <div style="font-weight: 600; color: var(--text-main);">Unlock elevated privileges options</div>
                     <div style="font-size: 0.75rem; color: var(--text-dim);">
-                        Current state: <span
+                        Current state: <span id="elevated-state-text"
                             style="font-weight: 700; color: {{ 'var(--success)' if elevated_unlocked else 'var(--danger)' }};">
                             {{ 'UNLOCKED' if elevated_unlocked else 'LOCKED' }}
                         </span>
@@ -81,8 +81,32 @@
                     });
                     const data = await r.json();
                     if (data.success) {
-                        // Refresh settings content to reflect state change
-                        htmx.trigger('#settings-content-area', 'refresh-security');
+                        // Update UI directly immediately
+                        const wrapper = document.getElementById('elevated-icon-wrapper');
+                        const icon = document.getElementById('elevated-icon');
+                        const text = document.getElementById('elevated-state-text');
+                        
+                        if (isUnlocked) {
+                            wrapper.style.background = 'rgba(34, 197, 94, 0.1)';
+                            icon.setAttribute('data-lucide', 'shield-check');
+                            icon.style.color = 'var(--success)';
+                            text.textContent = 'UNLOCKED';
+                            text.style.color = 'var(--success)';
+                        } else {
+                            wrapper.style.background = 'rgba(239, 68, 68, 0.1)';
+                            icon.setAttribute('data-lucide', 'shield-alert');
+                            icon.style.color = 'var(--danger)';
+                            text.textContent = 'LOCKED';
+                            text.style.color = 'var(--danger)';
+                        }
+                        
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+                        const contentArea = document.querySelector('#settings-content-area');
+                        if (contentArea) {
+                            htmx.trigger(contentArea, 'refresh-security');
+                        }
+
                         if (window.showNotification) {
                             window.showNotification(`Elevated privileges ${isUnlocked ? 'unlocked' : 'locked'}.`, isUnlocked ? 'success' : 'warning');
                         }
