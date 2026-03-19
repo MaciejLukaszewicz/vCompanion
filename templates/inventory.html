@@ -1287,6 +1287,18 @@
         refreshInventoryPanels();
     }
 
+    // Re-apply client-side snapshot filter after HTMX updates the list
+    document.addEventListener('htmx:afterSettle', function(evt) {
+        if (evt.detail.target.id === 'snapshots-list-target') {
+            const input = document.getElementById('snap-search-input');
+            if (input && input.value) {
+                if (typeof filterSnapshots === 'function') {
+                    filterSnapshots(input.value);
+                }
+            }
+        }
+    });
+
     // Initialize on load (handle both direct and HTMX loads)
     function initInventory() {
         window.isSearchFocused = false;
