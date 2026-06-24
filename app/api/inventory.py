@@ -67,7 +67,7 @@ async def get_vms_partial(request: Request, q: str = "", snaps_only: bool = Fals
         vm['vc_color_index'] = get_vc_color(vm.get('vcenter_id', ''))
 
     from main import templates
-    return templates.TemplateResponse("partials/inventory_vms_list.html", {
+    return templates.TemplateResponse(request, "partials/inventory_vms_list.html", {
         "request": request,
         "vms": vms,
         "selected_vm_id": selected_vm_id,
@@ -298,7 +298,7 @@ async def get_vm_details(request: Request, vcenter_id: str, vm_id: str):
         logger.error(f"Error building storage tree: {e}")
 
     from main import templates
-    return templates.TemplateResponse("partials/inventory_vm_details.html", {
+    return templates.TemplateResponse(request, "partials/inventory_vm_details.html", {
         "request": request,
         "vm": vm,
         "network_tree": network_tree,
@@ -322,7 +322,7 @@ async def get_hosts_partial(request: Request):
         host['vc_color_index'] = get_vc_color(host.get('vcenter_id', ''))
 
     from main import templates
-    return templates.TemplateResponse("partials/inventory_hosts_list.html", {
+    return templates.TemplateResponse(request, "partials/inventory_hosts_list.html", {
         "request": request,
         "hosts": hosts
     })
@@ -381,7 +381,7 @@ async def get_host_details(request: Request, vcenter_id: str, mo_id: str):
     host['memory_usage_formatted'] = f"{host.get('memory_usage_mb', 0) / 1024:.2f} GB"
     
     from main import templates
-    return templates.TemplateResponse("partials/inventory_host_details.html", {
+    return templates.TemplateResponse(request, "partials/inventory_host_details.html", {
         "request": request,
         "host": host,
         "elevated_unlocked": is_elevated_unlocked(request)
@@ -542,7 +542,7 @@ async def get_snapshots_partial(request: Request, today_only: bool = False):
     global_snapshots.sort(key=lambda x: x.get('created', ''), reverse=True)
     
     from main import templates
-    return templates.TemplateResponse("partials/snapshots_table.html", {
+    return templates.TemplateResponse(request, "partials/snapshots_table.html", {
         "request": request,
         "global_snapshots": global_snapshots,
         "snap_count": len(global_snapshots),
@@ -811,7 +811,7 @@ async def get_vcenters_partial(request: Request):
     vcenter_statuses.sort(key=lambda x: x.get('name', '').lower())
     
     from main import templates
-    return templates.TemplateResponse("partials/inventory_vcenters_list.html", {
+    return templates.TemplateResponse(request, "partials/inventory_vcenters_list.html", {
         "request": request,
         "vcenters": vcenter_statuses,
         "elevated_unlocked": is_elevated_unlocked(request)
@@ -961,7 +961,7 @@ async def get_networks_partial(request: Request):
     vcenter_data.sort(key=lambda x: x['name'].lower())
 
     from main import templates
-    return templates.TemplateResponse("partials/inventory_networks.html", {
+    return templates.TemplateResponse(request, "partials/inventory_networks.html", {
         "request": request,
         "vcenters": vcenter_data
     })
@@ -1044,7 +1044,7 @@ async def get_storage_partial(request: Request):
     vcenter_data.sort(key=lambda x: x['name'].lower())
 
     from main import templates
-    return templates.TemplateResponse("partials/inventory_storage.html", {
+    return templates.TemplateResponse(request, "partials/inventory_storage.html", {
         "request": request,
         "vcenters": vcenter_data
     })

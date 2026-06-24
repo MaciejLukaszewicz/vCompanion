@@ -148,7 +148,7 @@ async def login_page(request: Request):
     if is_authenticated(request):
         return RedirectResponse(url="/", status_code=303)
     
-    return templates.TemplateResponse("login.html", {
+    return templates.TemplateResponse(request, "login.html", {
         "request": request,
         "vcenters": [{"id": vc.id, "name": vc.name, "host": vc.host} for vc in settings.vcenters if vc.enabled]
     })
@@ -175,7 +175,7 @@ async def index(request: Request):
         'warning_alerts': stats_data.get('warning_alerts', 0)
     }
     
-    return templates.TemplateResponse("dashboard.html", {
+    return templates.TemplateResponse(request, "dashboard.html", {
         "request": request, 
         "username": request.session.get("username"),
         "active_page": "dashboard",
@@ -191,7 +191,7 @@ async def inventory(request: Request):
     if not is_authenticated(request):
         return RedirectResponse(url="/login", status_code=303)
     
-    return templates.TemplateResponse("inventory.html", {
+    return templates.TemplateResponse(request, "inventory.html", {
         "request": request,
         "username": request.session.get("username"),
         "active_page": "inventory",
@@ -204,7 +204,7 @@ async def reports(request: Request):
     if not is_authenticated(request):
         return RedirectResponse(url="/login", status_code=303)
     
-    return templates.TemplateResponse("reports.html", {
+    return templates.TemplateResponse(request, "reports.html", {
         "request": request,
         "username": request.session.get("username"),
         "active_page": "reports",
@@ -214,7 +214,7 @@ async def reports(request: Request):
 @app.get("/hosts")
 async def hosts_page(request: Request):
     if not is_authenticated(request): return RedirectResponse(url="/login", status_code=303)
-    return templates.TemplateResponse("hosts.html", {
+    return templates.TemplateResponse(request, "hosts.html", {
         "request": request, "username": request.session.get("username"),
         "active_page": "hosts", "vcenter_status": get_vcenter_status(request)
     })
@@ -222,7 +222,7 @@ async def hosts_page(request: Request):
 @app.get("/datastores")
 async def datastores_page(request: Request):
     if not is_authenticated(request): return RedirectResponse(url="/login", status_code=303)
-    return templates.TemplateResponse("datastores.html", {
+    return templates.TemplateResponse(request, "datastores.html", {
         "request": request, "username": request.session.get("username"),
         "active_page": "datastores", "vcenter_status": get_vcenter_status(request)
     })
@@ -292,7 +292,7 @@ async def performance_page(request: Request):
     # Top 10 Hosts by Memory
     top_mem_hosts = sorted(hosts, key=lambda x: x.get('memory_usage_mb', 0), reverse=True)[:10]
 
-    return templates.TemplateResponse("performance.html", {
+    return templates.TemplateResponse(request, "performance.html", {
         "request": request, "username": request.session.get("username"),
         "active_page": "performance", "vcenter_status": get_vcenter_status(request),
         "clusters": clusters,
@@ -309,7 +309,7 @@ async def settings_page(request: Request):
     if not is_authenticated(request):
         return RedirectResponse(url="/login", status_code=303)
     
-    return templates.TemplateResponse("settings.html", {
+    return templates.TemplateResponse(request, "settings.html", {
         "request": request,
         "username": request.session.get("username"),
         "active_page": "settings",
