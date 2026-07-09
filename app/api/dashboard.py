@@ -70,7 +70,7 @@ async def get_events_table(request: Request, filter_logon: bool = True):
         
     from main import templates
     logger.info(f"API: Returning {len(events)} events")
-    return templates.TemplateResponse("partials/events_table.html", {"request": request, "events": events})
+    return templates.TemplateResponse(request, "partials/events_table.html", {"request": request, "events": events})
 
 @router.get("/tasks-table")
 async def get_tasks_table(request: Request, active_only: bool = False):
@@ -86,7 +86,7 @@ async def get_tasks_table(request: Request, active_only: bool = False):
         
     from main import templates
     logger.info(f"API: Returning {len(tasks)} tasks")
-    return templates.TemplateResponse("partials/tasks_table.html", {"request": request, "tasks": tasks})
+    return templates.TemplateResponse(request, "partials/tasks_table.html", {"request": request, "tasks": tasks})
 
 @router.get("/alerts-table")
 async def get_alerts_table(request: Request):
@@ -150,7 +150,7 @@ async def get_alerts_table(request: Request):
         logger.info(f"Stats: {stats}")
     
     from main import templates
-    return templates.TemplateResponse("partials/dashboard_alerts_table.html", {
+    return templates.TemplateResponse(request, "partials/dashboard_alerts_table.html", {
         "request": request, 
         "alerts": processed_alerts,
         "stats": stats

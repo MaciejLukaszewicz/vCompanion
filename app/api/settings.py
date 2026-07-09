@@ -14,7 +14,7 @@ async def get_vcenters_list(request: Request):
     """Returns the vCenter list partial for settings."""
     require_auth(request)
     from main import templates
-    return templates.TemplateResponse("partials/settings_vcenters.html", {
+    return templates.TemplateResponse(request, "partials/settings_vcenters.html", {
         "request": request,
         "vcenters": settings.vcenters
     })
@@ -57,7 +57,7 @@ async def add_vcenter(
         manager._last_refresh_trigger[new_id] = 0
     
     from main import templates
-    return templates.TemplateResponse("partials/settings_vcenters.html", {
+    return templates.TemplateResponse(request, "partials/settings_vcenters.html", {
         "request": request,
         "vcenters": settings.vcenters,
         "success_msg": f"vCenter '{name}' added successfully."
@@ -87,7 +87,7 @@ async def delete_vcenter(request: Request, vc_id: str):
         manager.configs = [cfg for cfg in manager.configs if cfg.id != vc_id]
     
     from main import templates
-    return templates.TemplateResponse("partials/settings_vcenters.html", {
+    return templates.TemplateResponse(request, "partials/settings_vcenters.html", {
         "request": request,
         "vcenters": settings.vcenters,
         "success_msg": "vCenter removed successfully."
@@ -98,7 +98,7 @@ async def get_add_form(request: Request):
     """Returns the clean add form for a vCenter."""
     require_auth(request)
     from main import templates
-    return templates.TemplateResponse("partials/settings_vcenter_form.html", {
+    return templates.TemplateResponse(request, "partials/settings_vcenter_form.html", {
         "request": request,
         "vc": None,
         "mode": "add"
@@ -113,7 +113,7 @@ async def get_edit_form(request: Request, vc_id: str):
         raise HTTPException(status_code=404, detail="vCenter not found")
     
     from main import templates
-    return templates.TemplateResponse("partials/settings_vcenter_form.html", {
+    return templates.TemplateResponse(request, "partials/settings_vcenter_form.html", {
         "request": request,
         "vc": vc,
         "mode": "edit"
@@ -169,7 +169,7 @@ async def update_vcenter(
             manager.configs.append(updated_vc)
     
     from main import templates
-    return templates.TemplateResponse("partials/settings_vcenters.html", {
+    return templates.TemplateResponse(request, "partials/settings_vcenters.html", {
         "request": request,
         "vcenters": settings.vcenters,
         "success_msg": f"vCenter '{name}' updated successfully."
@@ -180,7 +180,7 @@ async def get_application_settings(request: Request):
     """Returns the application settings partial."""
     require_auth(request)
     from main import templates
-    return templates.TemplateResponse("partials/settings_application.html", {
+    return templates.TemplateResponse(request, "partials/settings_application.html", {
         "request": request,
         "app_settings": settings.app_settings
     })
@@ -230,7 +230,7 @@ async def update_application_settings(
         request.app.state.vcenter_manager.global_refresh_interval = settings.app_settings.refresh_interval_seconds
         
     from main import templates
-    return templates.TemplateResponse("partials/settings_application.html", {
+    return templates.TemplateResponse(request, "partials/settings_application.html", {
         "request": request,
         "app_settings": settings.app_settings,
         "success_msg": "Application settings updated successfully."
@@ -241,7 +241,7 @@ async def get_security_settings(request: Request):
     """Returns the security settings partial."""
     require_auth(request)
     from main import templates
-    return templates.TemplateResponse("partials/settings_security.html", {
+    return templates.TemplateResponse(request, "partials/settings_security.html", {
         "request": request,
         "app_settings": settings.app_settings,
         "elevated_unlocked": is_elevated_unlocked(request)
@@ -269,7 +269,7 @@ async def update_security_settings(
     save_config(settings)
     
     from main import templates
-    return templates.TemplateResponse("partials/settings_security.html", {
+    return templates.TemplateResponse(request, "partials/settings_security.html", {
         "request": request,
         "app_settings": settings.app_settings,
         "elevated_unlocked": is_elevated_unlocked(request),

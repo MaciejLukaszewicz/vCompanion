@@ -63,6 +63,7 @@ async def login(
                 error_msg = error_messages[0] if error_messages else "Could not connect to any vCenter."
             
             return templates.TemplateResponse(
+                request,
                 "login.html",
                 {
                     "request": request,
@@ -80,6 +81,7 @@ async def login(
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         return templates.TemplateResponse(
+            request,
             "login.html",
             {
                 "request": request,

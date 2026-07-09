@@ -20,7 +20,7 @@ async def get_status_bar(request: Request):
     from main import templates, get_vcenter_status
     vcenter_status = get_vcenter_status(request)
     
-    response = templates.TemplateResponse("partials/vcenter_status_bar.html", {
+    response = templates.TemplateResponse(request, "partials/vcenter_status_bar.html", {
         "request": request,
         "vcenter_status": vcenter_status
     })
@@ -96,7 +96,7 @@ async def get_stats_cards(request: Request):
         }
         
         from main import templates
-        return templates.TemplateResponse("partials/stats_grid.html", {
+        return templates.TemplateResponse(request, "partials/stats_grid.html", {
             "request": request,
             "stats": stats,
             "per_vcenter_stats": stats_data.get('per_vcenter', {})
