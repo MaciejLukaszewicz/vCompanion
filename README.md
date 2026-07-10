@@ -225,6 +225,10 @@ A plugin should include:
 - `templates/` — optional Jinja2 templates
 - `static/` — optional plugin-specific CSS/JS/assets
 
+Security notes:
+- The application enforces plugin permissions and provides an isolated plugin cache area.
+- Set a secure session secret via environment variable `VCOMPANION_SECRET_KEY` in production.
+
 ### Plugin manifest
 The manifest defines how the host app should load the plugin. Example fields:
 - `id` — unique plugin identifier

@@ -81,14 +81,27 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import auth, dashboard, vcenters, inventory, settings as settings_api
 from app.core.session import is_authenticated, is_elevated_unlocked
+from app.plugins.manager import PluginManager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup tasks
     from app.services.vcenter_service import VCenterManager
     app.state.vcenter_manager = VCenterManager(settings.vcenters)
+    # Initialize plugin manager (scans plugins/ but plugins must be safe)
+    try:
+        app.state.plugin_manager = PluginManager(app)
+        app.state.plugin_manager.startup(app)
+    except Exception as e:
+        logging.getLogger("vCompanion").error(f"PluginManager startup error: {e}")
     yield
     # Shutdown tasks
+    # Shutdown plugins first
+    if hasattr(app.state, 'plugin_manager'):
+        try:
+            app.state.plugin_manager.shutdown()
+        except Exception as e:
+            logging.getLogger("vCompanion").error(f"PluginManager shutdown error: {e}")
     if hasattr(app.state, 'vcenter_manager'):
         app.state.vcenter_manager.disconnect_all()
 
@@ -111,7 +124,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     )
 
 # Add session middleware
-SECRET_KEY = "vcompanion-secret-key-change-this-in-production"
+SECRET_KEY = os.getenv('VCOMPANION_SECRET_KEY', "vcompanion-secret-key-change-this-in-production")
+if SECRET_KEY == "vcompanion-secret-key-change-this-in-production":
+    logging.getLogger('vCompanion').warning("Using default SECRET_KEY; set VCOMPANION_SECRET_KEY in production")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # Resolve base directory

@@ -42,6 +42,10 @@ class CacheService:
         self.data_dir = project_root / "data"
         self.data_dir.mkdir(exist_ok=True)
         self._data = {"vcenters": {}, "vms": {}, "hosts": {}, "alerts": {}, "networks": {}, "storage": {}, "clusters": {}}
+        # plugin-scoped encrypted storage
+        self._data["plugins"] = {}
+        self.plugins_dir = self.data_dir / "plugins"
+        self.plugins_dir.mkdir(exist_ok=True)
         self.salt_path = self.data_dir / "salt.bin"
         if not self.salt_path.exists():
             self.salt = os.urandom(16)
@@ -65,6 +69,8 @@ class CacheService:
                 self._fernet = Fernet(key)
                 self._is_unlocked = True
                 self._load_from_disk()
+                # Load any plugin-scoped stores
+                self._load_plugins_from_disk()
                 return True
             except: return False
 
@@ -87,12 +93,33 @@ class CacheService:
         for k in keys_to_save:
             try:
                 # Capture current state of the specific category to avoid modification during encryption
-                data_to_serialize = self._data[k]
-                content = json.dumps(data_to_serialize, cls=VMwareJSONEncoder).encode()
-                encrypted = self._fernet.encrypt(content)
-                self._get_file_path(k).write_bytes(encrypted)
+                if k == "plugins":
+                    # write each plugin store to a separate file under data/plugins/
+                    for pid, pdata in self._data.get("plugins", {}).items():
+                        content = json.dumps(pdata, cls=VMwareJSONEncoder).encode()
+                        encrypted = self._fernet.encrypt(content)
+                        ppath = self.plugins_dir / f"{pid}.enc"
+                        ppath.write_bytes(encrypted)
+                else:
+                    data_to_serialize = self._data[k]
+                    content = json.dumps(data_to_serialize, cls=VMwareJSONEncoder).encode()
+                    encrypted = self._fernet.encrypt(content)
+                    self._get_file_path(k).write_bytes(encrypted)
             except Exception as e: 
                 logger.error(f"Error saving {k} to disk: {e}")
+
+    def _plugin_file_path(self, plugin_id: str) -> Path:
+        return self.plugins_dir / f"{plugin_id}.enc"
+
+    def _save_plugin_to_disk(self, plugin_id: str):
+        if not self._is_unlocked or not self._fernet: return
+        pdata = self._data.get("plugins", {}).get(plugin_id, {})
+        try:
+            content = json.dumps(pdata, cls=VMwareJSONEncoder).encode()
+            encrypted = self._fernet.encrypt(content)
+            self._plugin_file_path(plugin_id).write_bytes(encrypted)
+        except Exception as e:
+            logger.error(f"Error saving plugin {plugin_id} to disk: {e}")
 
     def _load_from_disk(self):
         """Assumes lock is already held by the caller (derive_key)."""
@@ -109,6 +136,35 @@ class CacheService:
                         self._data[key] = loaded
                 except Exception as e:
                     logger.error(f"Error loading {key} from disk: {e}")
+
+    def _load_plugin_from_disk(self, plugin_id: str):
+        ppath = self._plugin_file_path(plugin_id)
+        if not ppath.exists():
+            return
+        try:
+            encrypted = ppath.read_bytes()
+            decrypted = self._fernet.decrypt(encrypted)
+            loaded = json.loads(decrypted.decode())
+            if isinstance(loaded, dict):
+                self._data["plugins"][plugin_id] = loaded
+        except Exception as e:
+            logger.error(f"Error loading plugin {plugin_id} from disk: {e}")
+
+    def _load_plugins_from_disk(self):
+        try:
+            if not self.plugins_dir.exists(): return
+            for pfile in self.plugins_dir.glob('*.enc'):
+                plugin_id = pfile.stem
+                try:
+                    encrypted = pfile.read_bytes()
+                    decrypted = self._fernet.decrypt(encrypted)
+                    loaded = json.loads(decrypted.decode())
+                    if isinstance(loaded, dict):
+                        self._data["plugins"][plugin_id] = loaded
+                except Exception as e:
+                    logger.error(f"Error loading plugin file {pfile}: {e}")
+        except Exception as e:
+            logger.error(f"Error scanning plugins directory: {e}")
 
     def update_vcenter_status(self, vc_id: str, name: str, status: str, error: str = None, metadata: dict = None):
         with self._lock:
