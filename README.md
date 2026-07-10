@@ -228,6 +228,8 @@ A plugin should include:
 Security notes:
 - The application enforces plugin permissions and provides an isolated plugin cache area.
 - Set a secure session secret via environment variable `VCOMPANION_SECRET_KEY` in production.
+ - The application enforces template/static registration only for paths inside each plugin folder; plugins cannot mount arbitrary folders from the host.
+ - Plugin cache is scoped per-plugin and accessible only through the `PluginContext.cache` API; direct file access to `data/*.enc` is unsupported and discouraged.
 
 ### Plugin manifest
 The manifest defines how the host app should load the plugin. Example fields:

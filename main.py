@@ -80,6 +80,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import auth, dashboard, vcenters, inventory, settings as settings_api
+from app.api import plugins as plugins_api
 from app.core.session import is_authenticated, is_elevated_unlocked
 from app.plugins.manager import PluginManager
 
@@ -91,7 +92,7 @@ async def lifespan(app: FastAPI):
     # Initialize plugin manager (scans plugins/ but plugins must be safe)
     try:
         app.state.plugin_manager = PluginManager(app)
-        app.state.plugin_manager.startup(app)
+        await app.state.plugin_manager.startup(app)
     except Exception as e:
         logging.getLogger("vCompanion").error(f"PluginManager startup error: {e}")
     yield
@@ -99,7 +100,7 @@ async def lifespan(app: FastAPI):
     # Shutdown plugins first
     if hasattr(app.state, 'plugin_manager'):
         try:
-            app.state.plugin_manager.shutdown()
+            await app.state.plugin_manager.shutdown()
         except Exception as e:
             logging.getLogger("vCompanion").error(f"PluginManager shutdown error: {e}")
     if hasattr(app.state, 'vcenter_manager'):
@@ -145,6 +146,7 @@ app.include_router(dashboard.router)
 app.include_router(vcenters.router)
 app.include_router(inventory.router)
 app.include_router(settings_api.router)
+app.include_router(plugins_api.router)
 
 def get_vcenter_status(request: Request):
     """Helper to get vCenter connection status for templates."""

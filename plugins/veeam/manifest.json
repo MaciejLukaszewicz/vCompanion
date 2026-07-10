@@ -1,8 +1,16 @@
 {
   "id": "veeam",
   "name": "Veeam Backup Server",
-  "description": "Integracja z Veeam REST API (przykładowy plugin)",
+  "description": "Integracja z Veeam REST API (przyk\u00c5\u201aadowy plugin)",
   "module": "plugins.veeam.plugin",
-  "enabled": true,
-  "permissions": ["routes", "sidebar", "pages", "static", "templates", "cache:read", "cache:write"]
+  "enabled": false,
+  "permissions": [
+    "routes",
+    "sidebar",
+    "pages",
+    "static",
+    "templates",
+    "cache:read",
+    "cache:write"
+  ]
 }

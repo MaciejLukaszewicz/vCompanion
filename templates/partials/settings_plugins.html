@@ -1,0 +1,47 @@
+<div class="settings-section">
+  <h2>Plugins</h2>
+  <p style="color: var(--text-dim)">Manage installed plugins. Enable or disable plugins from here.</p>
+
+  <div style="margin-top:1rem;">
+    <table style="width:100%">
+      <thead>
+        <tr>
+          <th style="text-align:left">Plugin</th>
+          <th style="text-align:left">Description</th>
+          <th style="width:120px">Enabled</th>
+          <th style="width:140px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in plugins %}
+        <tr>
+          <td>{{ p.manifest.name if p.manifest and p.manifest.name else p.id }}</td>
+          <td style="color:var(--text-dim)">{{ p.manifest.description if p.manifest and p.manifest.description else '' }}</td>
+          <td>
+            <form hx-post="/api/plugins/set/{{ p.id }}" hx-trigger="change" hx-swap="none">
+              <label class="toggle-item">
+                <div class="switch">
+                  <input type="checkbox" name="enabled" value="true" {% if p.enabled %}checked{% endif %}>
+                  <span class="slider"></span>
+                </div>
+              </label>
+            </form>
+          </td>
+          <td>
+            {% if p.loaded %}
+              <span style="color:var(--success)">Loaded</span>
+            {% elif p.enabled %}
+              <span style="color:var(--primary)">Enabled (not loaded)</span>
+            {% else %}
+              <span style="color:var(--text-dim)">Disabled</span>
+            {% endif %}
+            {% if p.failed %}
+              <div style="color:var(--danger); margin-top:6px">Error: {{ p.failed }}</div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

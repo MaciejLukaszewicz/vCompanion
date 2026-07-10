@@ -247,6 +247,37 @@ async def get_security_settings(request: Request):
         "elevated_unlocked": is_elevated_unlocked(request)
     })
 
+
+@router.get("/plugins")
+async def get_plugins_settings(request: Request):
+    """Returns the plugins management partial for Settings."""
+    require_auth(request)
+    from main import templates
+    pm = getattr(request.app.state, 'plugin_manager', None)
+    plugins = []
+    if pm:
+        root = pm._plugin_root()
+        for p in root.iterdir():
+            if not p.is_dir():
+                continue
+            m = p / 'manifest.json'
+            data = {"id": p.name, "manifest": None, "loaded": False, "failed": None}
+            if m.exists():
+                try:
+                    manifest = json.loads(m.read_text())
+                    data['manifest'] = manifest
+                    data['enabled'] = manifest.get('enabled', True)
+                except Exception as e:
+                    data['manifest_error'] = str(e)
+            data['loaded'] = p.name in pm.plugins
+            if p.name in pm.failed:
+                data['failed'] = pm.failed.get(p.name)
+            plugins.append(data)
+    return templates.TemplateResponse(request, 'partials/settings_plugins.html', {
+        'request': request,
+        'plugins': plugins
+    })
+
 @router.post("/security/elevated")
 async def toggle_elevated_privileges(request: Request):
     """Toggles session-level elevated privileges."""

@@ -41,14 +41,22 @@ class PluginContext:
         self._require("templates")
         try:
             import main
-            plugin_templates = str(Path(self.plugin.path) / rel_path)
+            plugin_base = Path(self.plugin.path).resolve()
+            plugin_templates_path = (plugin_base / rel_path).resolve()
+            # Ensure the requested templates path is inside the plugin folder
+            try:
+                plugin_templates_path.relative_to(plugin_base)
+            except Exception:
+                raise PermissionError(f"Templates path {plugin_templates_path} is outside plugin directory")
+
             loader = main.templates.env.loader
             if hasattr(loader, 'searchpath'):
-                loader.searchpath.append(plugin_templates)
+                if str(plugin_templates_path) not in loader.searchpath:
+                    loader.searchpath.append(str(plugin_templates_path))
             else:
                 # fallback: no-op
                 self.logger.warning("Unable to register templates: unsupported loader")
-            self.logger.info(f"Registered templates from {plugin_templates}")
+            self.logger.info(f"Registered templates from {plugin_templates_path}")
         except Exception as e:
             self.logger.error(f"Failed to register templates: {e}")
 
@@ -56,7 +64,14 @@ class PluginContext:
     def register_static(self, rel_path: str, mount_path: str | None = None):
         self._require("static")
         try:
-            static_dir = Path(self.plugin.path) / rel_path
+            plugin_base = Path(self.plugin.path).resolve()
+            static_dir = (plugin_base / rel_path).resolve()
+            # Prevent mounting directories outside plugin folder
+            try:
+                static_dir.relative_to(plugin_base)
+            except Exception:
+                raise PermissionError(f"Static path {static_dir} is outside plugin directory")
+
             if not static_dir.exists():
                 self.logger.warning(f"Static path does not exist: {static_dir}")
                 return
@@ -109,6 +124,9 @@ class PluginContext:
     def cache(self):
         # return a proxy bound to plugin so methods enforce per-op permissions
         return PluginContext._CacheProxy(self.plugin)
+
+
+import inspect
 
 
 class PluginManager:
@@ -176,7 +194,7 @@ class PluginManager:
             except Exception as e:
                 logger.error(f"Failed to parse manifest for plugin at {p}: {e}")
 
-    def startup(self, app):
+    async def startup(self, app):
         self.app = app
         # reset UI registries
         self.sidebar_items = []
@@ -189,25 +207,75 @@ class PluginManager:
                 ctx = PluginContext(plugin, self, app)
                 # call startup if implemented
                 if hasattr(plugin, 'startup'):
-                    # allow synchronous or coroutine
                     res = plugin.startup(ctx)
-                    if hasattr(res, '__await__'):
-                        import asyncio
-                        asyncio.get_event_loop().run_until_complete(res)
+                    if inspect.isawaitable(res):
+                        await res
                 logger.info(f"Started plugin {pid}")
             except Exception as e:
                 logger.error(f"Plugin {pid} failed to start: {e}")
                 self.failed[pid] = str(e)
 
-    def shutdown(self):
+    async def load_plugin(self, plugin_id: str):
+        """Load and start a single plugin by id (reads manifest.json and imports module)."""
+        root = self._plugin_root()
+        p = root / plugin_id
+        manifest_path = p / "manifest.json"
+        if not manifest_path.exists():
+            raise FileNotFoundError(f"Manifest for plugin {plugin_id} not found")
+        manifest = json.loads(manifest_path.read_text())
+        if not manifest.get("enabled", True):
+            # enable in manifest
+            manifest["enabled"] = True
+            manifest_path.write_text(json.dumps(manifest, indent=2))
+
+        module_path = manifest.get("module")
+        mod = importlib.import_module(module_path)
+        PluginClass = getattr(mod, "Plugin", None)
+        create_fn = getattr(mod, "create_plugin", None)
+        if PluginClass:
+            inst = PluginClass(manifest, p)
+        elif create_fn:
+            inst = create_fn(manifest, p)
+        else:
+            raise RuntimeError(f"Plugin module {module_path} missing Plugin class or factory")
+
+        self.plugins[plugin_id] = inst
+        # start it
+        ctx = PluginContext(inst, self, self.app)
+        if hasattr(inst, 'startup'):
+            res = inst.startup(ctx)
+            if inspect.isawaitable(res):
+                await res
+        logger.info(f"Loaded and started plugin {plugin_id}")
+
+    async def unload_plugin(self, plugin_id: str):
+        """Shutdown and remove a loaded plugin.
+        This does not delete files; it simply stops the plugin and removes it from memory.
+        """
+        if plugin_id not in self.plugins:
+            raise KeyError(f"Plugin {plugin_id} not loaded")
+        inst = self.plugins[plugin_id]
+        ctx = PluginContext(inst, self, self.app)
+        if hasattr(inst, 'shutdown'):
+            res = inst.shutdown(ctx)
+            if inspect.isawaitable(res):
+                await res
+        # cleanup mounted statics and UI entries
+        # remove sidebar items matching id
+        self.sidebar_items = [s for s in self.sidebar_items if s.get('id') != plugin_id]
+        self.settings_pages = [s for s in self.settings_pages if s.get('route') != f"/plugins/{plugin_id}"]
+        # attempt to unmount static (FastAPI does not support unmounting; leave mounted but remove reference)
+        self.plugins.pop(plugin_id, None)
+        logger.info(f"Unloaded plugin {plugin_id}")
+
+    async def shutdown(self):
         for pid, plugin in list(self.plugins.items()):
             try:
                 ctx = PluginContext(plugin, self, self.app)
                 if hasattr(plugin, 'shutdown'):
                     res = plugin.shutdown(ctx)
-                    if hasattr(res, '__await__'):
-                        import asyncio
-                        asyncio.get_event_loop().run_until_complete(res)
+                    if inspect.isawaitable(res):
+                        await res
                 logger.info(f"Shutdown plugin {pid}")
             except Exception as e:
                 logger.error(f"Plugin {pid} failed to shutdown cleanly: {e}")
