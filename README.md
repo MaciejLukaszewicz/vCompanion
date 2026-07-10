@@ -199,6 +199,70 @@ Keep your installation up-to-date:
 
 ---
 
+## 🧩 Plugin Architecture
+vCompanion supports extension through filesystem-based plugins. A plugin is registered by placing a folder under `plugins/`; removing that folder unregisters it.
+
+### How plugins work
+- Each plugin lives in `plugins/<plugin_id>/`
+- The host app and vCenter functionality remain fully operational even if plugins fail
+- Plugins should be isolated: errors must not break the core vCenter workflow
+- Plugin data can be stored separately from the main vCenter cache
+- Plugins may provide:
+  - their own REST/HTMX routes
+  - their own templates and static assets
+  - a sidebar menu item
+  - a page in the Settings section
+  - their own configuration files
+
+### Plugin structure
+A plugin should include:
+- `manifest.json` — metadata and registration info
+- `config.json` — optional plugin-specific configuration
+- `plugin.py` — plugin bootstrap and registration code
+- `routes.py` — plugin routes and endpoint definitions
+- `client.py` — optional API client or integration helper
+- `models.py` — optional Pydantic models for plugin data
+- `templates/` — optional Jinja2 templates
+- `static/` — optional plugin-specific CSS/JS/assets
+
+### Plugin manifest
+The manifest defines how the host app should load the plugin. Example fields:
+- `id` — unique plugin identifier
+- `name` — display name
+- `description` — short description
+- `module` — Python import path to plugin bootstrap module
+- `enabled` — whether the plugin should be activated
+- `sidebar` — optional sidebar registration
+- `settings` — optional settings page registration
+
+### Sidebar and Settings integration
+- Plugins may register a sidebar item for their main UI page
+- Plugins may also add a dedicated Settings section
+- This allows plugins to integrate cleanly into the existing app navigation
+
+### Configuration and isolation
+- Global app config remains in `config/config.json`
+- Plugin-specific configuration may be stored in `plugins/<plugin_id>/config.json`
+- Plugin lifecycle must be independent from core app lifecycle
+- The core vCenter application must continue operating normally, regardless of plugin state
+
+### Security & Isolation (Security by Design)
+- Plugins MUST NOT access arbitrary filesystem paths inside the application workspace (including other plugin folders or `config/`).
+- Plugins MUST NOT access the central cache or plugin data stores directly via file reads; they may only use the provided `PluginContext.cache` API.
+- The host app enforces a permissions model declared in `manifest.json` (e.g. `permissions: ["storage:read","storage:write","routes","sidebar"]`).
+- Plugin loading is wrapped in error handlers; a failing plugin must not prevent the main app or other plugins from running.
+- For stronger isolation, consider running untrusted plugins in subprocesses or containers (future enhancement).
+
+Implementation notes:
+- The host provides a `PluginContext` API to plugins that exposes only allowed functionality (`register_router`, `register_templates`, `cache.set/get/delete`, logger, and limited settings access).
+- All plugin data saved through the `PluginContext.cache` is stored in an encrypted area scoped to the plugin id (e.g. `plugins.<plugin_id>`) and cannot be read by other plugins or by direct filesystem access.
+- Manifest-declared permissions are checked during plugin registration; operations outside the declared permissions are denied and logged.
+
+### Example plugin location
+`plugins/veeam/` is the first plugin example for Veeam Backup Server integration.
+
+---
+
 ## 🎯 Use Cases
 
 - **Multi-Site Management**: Oversee production, DR, and development vCenters from one interface
